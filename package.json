@@ -1,0 +1,46 @@
+{
+  "name": "social-machine",
+  "productName": "Social Machine",
+  "version": "0.1.0",
+  "description": "Central local de conteúdo: biblioteca, edição, distribuição e análise de vídeos curtos, integrada à Drop Machine.",
+  "private": true,
+  "main": "./out/main/index.js",
+  "author": "Pedro (Luneta)",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps && node scripts/fetch-ffmpeg.mjs",
+    "fetch:ffmpeg": "node scripts/fetch-ffmpeg.mjs --strict",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.e2e.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "node scripts/fetch-ffmpeg.mjs --strict && electron-vite build && playwright test --project=dev",
+    "test:packaged": "playwright test --project=packaged",
+    "dist:win": "node scripts/fetch-ffmpeg.mjs --target win32-x64 --strict && electron-vite build && electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.6.0",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.4"
+  }
+}

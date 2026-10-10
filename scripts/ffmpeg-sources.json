@@ -1,0 +1,23 @@
+{
+  "$comment": "Pinned FFmpeg builds bundled with the app. Change only together with TECHNICAL_DECISIONS.md (TD-012) and docs/FFMPEG.md. sha256 values match BtbN's published checksums.sha256 for this release.",
+  "ffmpegVersion": "9.0.2",
+  "describe": "n9.0.2-17-g2a571b6068",
+  "ffmpegCommit": "2a571b6068",
+  "license": "LGPL-3.0-or-later",
+  "variant": "lgpl-shared",
+  "publisher": "BtbN/FFmpeg-Builds",
+  "releaseTag": "autobuild-2026-09-30-13-08",
+  "baseUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08",
+  "targets": {
+    "win32-x64": {
+      "asset": "ffmpeg-n9.0.2-17-g2a571b6068-win64-lgpl-shared-9.0.zip",
+      "sha256": "7157177b8a6cb2174c1650ba8c71b363f2c78cba5330f88c4c02cf5b2b880646",
+      "size": 76972461
+    },
+    "linux-x64": {
+      "asset": "ffmpeg-n9.0.2-17-g2a571b6068-linux64-lgpl-shared-9.0.tar.xz",
+      "sha256": "7a1ba2af36e5beeb98151e766a903b1d115f2206a86571f17f873cd7292c424f",
+      "size": 63245836
+    }
+  }
+}

@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows — install, test, launch app, package
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      SM_E2E_DATA: ${{ github.workspace }}/e2e-data
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The pinned FFmpeg archive (scripts/ffmpeg-sources.json); its SHA-256 is verified after restore.
+      - name: Cache FFmpeg download
+        uses: actions/cache@v4
+        with:
+          path: vendor/ffmpeg/.cache
+          key: ffmpeg-${{ hashFiles('scripts/ffmpeg-sources.json') }}
+
+      # No lockfile yet: the first green run tells us the versions resolve together.
+      # After that, commit package-lock.json and switch this to `npm ci`.
+      - name: Install dependencies (rebuilds better-sqlite3 for Electron, installs FFmpeg)
+        run: scripts/ci-step.sh "npm install" npm install
+
+      - name: Verify bundled FFmpeg (strict)
+        run: scripts/ci-step.sh "FFmpeg" npm run fetch:ffmpeg
+
+      - name: Type check
+        run: scripts/ci-step.sh "Type check" npm run typecheck
+
+      - name: Unit tests (real FFmpeg)
+        run: npm test
+
+      - name: E2E — build and drive the real Electron app
+        run: npm run test:e2e
+
+      - name: Build Windows installer
+        run: scripts/ci-step.sh "electron-builder" npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Packaged app — bundled FFmpeg found and working
+        run: npm run test:packaged
+
+      - name: Upload installer
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: Upload test results and app logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-diagnostics
+          path: |
+            test-results/
+            e2e-data/**/app-data/logs/
+          if-no-files-found: ignore

@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+e2e-data/
+vendor/ffmpeg/

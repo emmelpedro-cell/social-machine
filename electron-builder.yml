@@ -1,0 +1,24 @@
+appId: studio.luneta.socialmachine
+productName: Social Machine
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+# Bundled FFmpeg (installed by scripts/fetch-ffmpeg.mjs, see docs/FFMPEG.md).
+# Lands in <install dir>/resources/ffmpeg, outside the asar archive so it can be executed.
+extraResources:
+  - from: vendor/ffmpeg/${platform}-${arch}
+    to: ffmpeg
+    filter:
+      - "**/*"
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+npmRebuild: true
