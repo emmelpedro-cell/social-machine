@@ -115,6 +115,11 @@ export class ImportService {
     }
   }
 
+  /** Pushes updated contents to the renderer after changes made outside the import pipeline. */
+  announce(items: readonly ContentItem[]): void {
+    for (const asset of items) this.emit({ type: 'asset', asset })
+  }
+
   /** Resolves when nothing is queued or processing (used by tests). */
   waitForIdle(): Promise<void> {
     if (!this.queueState().active) return Promise.resolve()

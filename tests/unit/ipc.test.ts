@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { ALL_IPC_CHANNELS, IpcChannels } from '../../src/shared/channels'
 import type { IpcResult, Project } from '../../src/shared/schemas'
-import type { ContentItem } from '../../src/shared/media'
+import type { ContentItem, MediaEvent } from '../../src/shared/media'
 import type { WatchFolderStatus } from '../../src/shared/watch'
 import { runMigrations } from '../../src/main/db/migrations'
 import { wrapHandler } from '../../src/main/ipc/handler'
@@ -23,6 +23,7 @@ function setup() {
   runMigrations(db)
   const logger = memoryLogger()
   const mediaRepo = new ContentsRepository(db)
+  const events: MediaEvent[] = []
   const watchRepo = new WatchFoldersRepository(db)
   const watchService = new WatchService({
     folders: watchRepo,
@@ -54,7 +55,7 @@ function setup() {
         thumbnailsDirectory: '/nonexistent/thumbs',
         tempDirectory: '/nonexistent/temp',
         logger,
-        emit: () => {}
+        emit: (event) => events.push(event)
       }),
       toolsStatus: async () => ({ ok: false, source: 'packaged', directory: '/x', code: 'MISSING', message: 'missing', detail: '' }),
       recheckTools: async () => ({ ok: false, source: 'packaged', directory: '/x', code: 'MISSING', message: 'missing', detail: '' }),
@@ -72,7 +73,7 @@ function setup() {
   })
   const call = <T>(channel: keyof HandlerTable, input?: unknown) =>
     wrapHandler(channel, table[channel], logger)(input) as Promise<IpcResult<T>>
-  return { call, logger, table, mediaRepo, watchRepo, watchService }
+  return { call, logger, table, mediaRepo, watchRepo, watchService, events }
 }
 
 describe('IPC handlers', () => {
@@ -188,6 +189,8 @@ describe('IPC handlers', () => {
     expect(moved.ok && moved.data.every((c) => c.projectId === mma.id)).toBe(true)
     const marked = await ctx.call<ContentItem[]>(IpcChannels.mediaSetWorkflowStatus, { ids: [a.id], workflowStatus: 'ready' })
     expect(marked.ok && marked.data[0]!.workflowStatus).toBe('ready')
+    // Changes are pushed to the renderer, so every open view updates.
+    expect(ctx.events).toContainEqual({ type: 'asset', asset: expect.objectContaining({ id: a.id, workflowStatus: 'ready' }) })
 
     const unknown = await ctx.call(IpcChannels.mediaSetProject, { ids: [a.id], projectId: '00000000-0000-4000-8000-000000000000' })
     expect(!unknown.ok && unknown.error.code).toBe('NOT_FOUND')

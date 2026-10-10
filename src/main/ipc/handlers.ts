@@ -226,18 +226,28 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
     }),
     [IpcChannels.mediaSetWorkflowStatus]: defineHandler({
       schema: SetWorkflowStatusInputSchema,
-      handle: ({ ids, workflowStatus }) => media.repo.setWorkflowStatus(ids, workflowStatus)
+      handle: ({ ids, workflowStatus }) => {
+        const updated = media.repo.setWorkflowStatus(ids, workflowStatus)
+        media.service.announce(updated)
+        return updated
+      }
     }),
     [IpcChannels.mediaSetProject]: defineHandler({
       schema: SetContentProjectInputSchema,
       handle: ({ ids, projectId }) => {
         assertProject(projectId)
-        return media.repo.setProject(ids, projectId)
+        const updated = media.repo.setProject(ids, projectId)
+        media.service.announce(updated)
+        return updated
       }
     }),
     [IpcChannels.mediaSetTitle]: defineHandler({
       schema: SetContentTitleInputSchema,
-      handle: ({ id, title }) => media.repo.setTitle(id, title)
+      handle: ({ id, title }) => {
+        const updated = media.repo.setTitle(id, title)
+        media.service.announce([updated])
+        return updated
+      }
     }),
 
     [IpcChannels.watchList]: defineHandler({
