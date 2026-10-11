@@ -61,8 +61,11 @@ async function libraryFiles(page: Page): Promise<string[]> {
   return result.data.map((c) => c.fileName).sort()
 }
 
+/** Visibility of the app's windows. Evaluation can fail transiently while a window changes state; that counts as "unknown". */
 const windowVisible = (app: ElectronApplication) =>
-  app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))
+  app
+    .evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.isVisible()))
+    .catch(() => null)
 
 test('imports videos into a project, shows metadata, thumbnail and preview, and keeps them after a restart', async () => {
   let { app, page } = await launchApp(dataDir)
@@ -186,7 +189,10 @@ test('keeps watching in the tray after the window is closed, and catches up on s
   }
 
   // Closing the window hides it; the app keeps running.
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close())
+  // Trigger the close from a timer so the evaluation returns before the window starts hiding.
+  await app.evaluate(({ BrowserWindow }) => {
+    setTimeout(() => BrowserWindow.getAllWindows()[0]?.close(), 50)
+  })
   await expect.poll(() => windowVisible(app)).toEqual([false])
 
   copyFileSync(fx.otherMp4, join(dropOutput, 'MMA Drop 003.mp4'))
