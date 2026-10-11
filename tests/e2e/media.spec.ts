@@ -261,7 +261,8 @@ test('imports files handed over the drag-and-drop path and reports invalid media
   const mov = join(footage, 'Bastidores.mov')
   const broken = join(footage, 'export-quebrado.mp4')
   const audio = join(footage, 'trilha.wav')
-  copyFileSync(fx.mov, mov)
+  // A clip not imported before (the same content would be skipped as a duplicate).
+  copyFileSync(fx.mov2, mov)
   copyFileSync(fx.corrupt, broken)
   copyFileSync(fx.wav, audio)
 

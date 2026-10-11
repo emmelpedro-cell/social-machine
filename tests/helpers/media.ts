@@ -41,6 +41,8 @@ export type Fixtures = {
   rotatedMp4: string
   /** Native vertical 9:16 H.264 + AAC, 180x320, 30 fps, 2 s (like a Drop Machine render). */
   vertical: string
+  /** Same format as `mov` (640x360, 25 fps) but different content. */
+  mov2: string
   /** Another vertical clip, same format as `vertical` but different content. */
   vertical2: string
   /** Another H.264 clip with different content from `mp4`. */
@@ -97,6 +99,12 @@ export function createFixtures(tools: MediaToolsLocation, dir: string): Fixtures
     f('vertical.mp4')
   ])
   ffmpeg(tools, [
+    '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=25:duration=2',
+    '-f', 'lavfi', '-i', 'sine=frequency=770:duration=2',
+    '-c:v', 'mpeg4', '-q:v', '5', '-c:a', 'pcm_s16le', '-shortest',
+    f('clip2.mov')
+  ])
+  ffmpeg(tools, [
     '-f', 'lavfi', '-i', 'testsrc=size=180x320:rate=30:duration=2',
     '-f', 'lavfi', '-i', 'sine=frequency=660:duration=2',
     '-c:v', 'libopenh264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', '-movflags', '+faststart',
@@ -132,6 +140,7 @@ export function createFixtures(tools: MediaToolsLocation, dir: string): Fixtures
     mov: f('clip.mov'),
     rotatedMp4: f('rotated.mp4'),
     vertical: f('vertical.mp4'),
+    mov2: f('clip2.mov'),
     vertical2: f('vertical2.mp4'),
     otherMp4: f('other.mp4'),
     corrupt: f('corrupt.mp4'),
