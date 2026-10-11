@@ -2287,10 +2287,11 @@ textarea {
 .weekday-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
 }
 .weekday-row .chip {
-  padding: 2px 8px;
+  padding: 2px 6px;
+  font-size: 11px;
 }
 .weekday-row .chip:disabled {
   opacity: 0.4;
