@@ -20,7 +20,12 @@ Acceptance criterion (spec §17): _the user can schedule and manage publications
 
 ### Verification (Phase 4)
 
-_Pending CI run._
+**Verified on Windows** (GitHub Actions `windows-latest`, run 38103746802, 2026-10-11): install, type check, unit tests, Electron E2E, installer build and packaged-app test all passed.
+
+- **Unit tests: 194 passed, 1 skipped.** New: local schedule run at its time with the manual reminder (once); locally scheduled YouTube upload at its time; a schedule missed while the app was closed flagged, notified once, listed as waiting regardless of range, then published on request; a slightly late schedule (within grace) still runs; YouTube `publishAt` (uploaded as private, exact `publishAt` sent, not reschedulable/pausable/cancellable from the app, live at its time); pause, reschedule while paused, resume, past-time rejection, cancel; past time means now; queue listing; atomic transitions; free-slot search (preferred days and times, taken slots, disabled); posting preferences storage.
+- **Electron E2E: 15 passed.** New, through the real UI: schedule a version to YouTube (native `publishAt` checked at the Google stand-in) and to a manual TikTok account; the queue groups them by day; the YouTube one has no reschedule button; reschedule TikTok, pause it (moves to "Precisa de você") and resume; set posting times; drag the TikTok post to another day on the calendar (time kept); details panel; dashboard upcoming list.
+- **Packaged app: 2 passed.**
+- Screenshots of the queue and calendar taken from the real app on CI (Screenshots workflow run 38104172214).
 
 ### Known limitations (Phase 4)
 
