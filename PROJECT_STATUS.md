@@ -27,23 +27,30 @@ Acceptance criterion (spec §17): _new clips from the Drop Machine appear in the
 
 ### Verification
 
-Run in the development container (Linux, Node 22, real FFmpeg 9.0.2 from the pinned build), before pushing:
+**Phase 1 verified on Windows** (GitHub Actions `windows-latest`, run 38098386103, 2026-10-11). Every step passed: install (better-sqlite3 rebuilt for Electron), strict FFmpeg verification, full type check (main, renderer, E2E), unit tests, Electron E2E, installer build, packaged-app test.
 
-- **Unit tests: 136 passed, 0 failed** across 13 files (run with Bun's Vitest-compatible runner because the npm registry was unreachable from that environment; CI runs them with Vitest). They include:
+- **Unit tests: 135 passed, 1 skipped** (the symlink test, which only applies outside Windows), across 13 files, with the bundled FFmpeg on generated real videos. They cover:
   - migrations: every table created, platforms seeded, constraints (unique project names, workflow values, idempotency keys), contents survive project deletion, no token columns;
   - repositories: projects (CRUD, duplicates, counts, suggested set), contents (workflow, project, title, stats), watch folders;
-  - import pipeline with real FFmpeg: videos imported with metadata and thumbnails; audio-only and still images rejected; duplicates by path and content; **renamed file keeps its id, project and status**; missing files and relink; cancel; crash recovery; FFmpeg unavailable; failed file retried after it changes;
-  - folder watching: existing files on start; **waits until a file stops growing**; no double import and no change to source files; **files created while closed found on start**; detection from events without a rescan; **detection by rescan when events never arrive**; watcher failure falls back to polling and re-attaches; missing folder becomes watched once it exists; disabled folders; deferred imports retried; failed files reconsidered once changed; end-to-end with the real importer: a render written in chunks is imported once into the folder's project as "needs review", a rename keeps the entry, and a copy adds nothing.
-- **Type check** of `src/main`, `src/preload`, `src/shared` and `src/renderer` with locally assembled type definitions: no errors in project code.
+  - import pipeline: metadata and thumbnails; audio-only and still images rejected; duplicates by path and content; a **renamed file keeps its id, project and status**; missing files and relink; cancel; crash recovery; FFmpeg unavailable; a failed file retried after it changes;
+  - folder watching: existing files on start; **waits until a file stops growing**; no double import and no change to source files; **files created while closed found on start**; detection from events without a rescan; **detection by rescan when events never arrive**; watcher failure falls back to polling and re-attaches; missing folder watched once it exists; disabled folders; deferred imports retried; end-to-end with the real importer (render written in chunks imported once as "needs review", rename keeps the entry, a copy adds nothing).
+- **Electron E2E (built app): 10 passed**, through the real UI:
+  - suggested and custom projects created, edited (hashtags) and still there after a restart;
+  - videos imported into a project with metadata (`0:02 · 180×320 · 9:16 · 30 fps`), thumbnail and preview decoded by Electron; title and status edited; all kept after a restart; re-import adds nothing;
+  - **Drop Machine output folder**: a clip already there is imported when the folder is added; a new clip written in chunks arrives once, in the folder's project, as "Precisa de revisão"; the sidebar badge and the dashboard update; source files untouched;
+  - **closing the window keeps the app in the tray and still importing**; a clip created while the app was fully closed is imported on the next start;
+  - bulk status and project changes; a moved file shown as missing and relinked; drag-and-drop path with clear Portuguese errors for a broken file and an audio-only file; forged paths rejected;
+  - the renderer has no Node access; the media protocol serves only library contents; later-phase screens are non-interactive.
+- **Packaged app (`dist/win-unpacked`): 2 passed**: FFmpeg bundled with its LGPL notices, found (`source: packaged`) and importing a video.
+- The installer is uploaded as the `windows-installer` artifact of each CI run.
 
-**Not verified in the container**, pending the Windows CI run on GitHub Actions (`windows-latest`): `npm install` with the real dependency versions, Vitest itself, the full `npm run typecheck` (including tests), Electron E2E (smoke and the media/watch/tray flows in `tests/e2e/`), the Windows installer build and the packaged-app test. This section is updated with the CI result.
-
-**Manual checks still needed on a real Windows desktop** (CI can't observe them): the tray icon and its menu, the balloon hint on first close, "start with Windows" after a real log-in, and watching a real Drop Machine output folder during a real render.
+**Manual checks still needed on a real Windows desktop** (CI can't observe them): how the tray icon and menu look and behave, the balloon hint on first close, "start with Windows" after a real log-in, and a real Drop Machine render landing in its output folder.
 
 ## Known issues / limitations
 
 - Integration with the Drop Machine is through its output folder only. Its code isn't in this repository, so its project data (sport, events) isn't read yet. If it's added to GitHub, contents could carry the sport preset and event timestamps.
 - A clip removed from the library while its file stays in a watched folder is imported again after the next restart (TD-104, known limitation).
+- A clip in a watched folder with the same content as one already in the library is skipped as a duplicate (with a notice), even if it has a different name.
 - Watching stops when the app is fully quit or the computer is off; the start-up reconciliation catches up (TD-105).
 - No proxies: codecs Chromium can't decode (ProRes, some HEVC) import correctly but can't be previewed (TD-018).
 - The installer is unsigned (SmartScreen warning) and has no auto-update.
