@@ -32,21 +32,9 @@ export function PhasePlaceholder({ title, phase, summary, planned }: Placeholder
   )
 }
 
-export type PlaceholderId = 'editor' | 'queue' | 'calendar' | 'inbox' | 'analytics' | 'accounts'
+export type PlaceholderId = 'queue' | 'calendar' | 'inbox' | 'analytics' | 'accounts'
 
 export const PLACEHOLDERS: Record<PlaceholderId, PlaceholderProps> = {
-  editor: {
-    title: 'Editor',
-    phase: 2,
-    summary: 'Preparar clipes para publicação sem abrir outro editor. O arquivo original nunca é sobrescrito.',
-    planned: [
-      'Corte do início e do fim, controle de duração',
-      'Recorte, zoom e reenquadramento para 9:16',
-      'Texto sobre o vídeo com fontes, cor, contorno e sombra',
-      'Presets por projeto e prévia das áreas cobertas pela interface das plataformas',
-      'Várias versões do mesmo conteúdo, exportadas com FFmpeg'
-    ]
-  },
   accounts: {
     title: 'Contas',
     phase: 3,

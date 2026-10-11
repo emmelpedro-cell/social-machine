@@ -15,6 +15,9 @@ extraResources:
     to: ffmpeg
     filter:
       - "**/*"
+  # License texts of the editor fonts bundled into the renderer (SIL OFL 1.1).
+  - from: src/renderer/src/fonts/licenses
+    to: font-licenses
 win:
   target:
     - nsis

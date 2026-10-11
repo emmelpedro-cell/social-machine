@@ -3,6 +3,7 @@ import type { MediaToolsStatus } from '../../../shared/media'
 import type { AppInfo, Project, Settings, SettingsUpdateInput } from '../../../shared/schemas'
 import { HEX_COLOR } from '../../../shared/schemas'
 import type { WatchFolderStatus } from '../../../shared/watch'
+import type { EncoderInfo } from '../../../shared/editor'
 import { api, unwrap } from '../api'
 import type { NoticeState } from '../components/Notice'
 import { WatchFoldersPanel } from '../components/WatchFoldersPanel'
@@ -50,6 +51,11 @@ export function SettingsScreen({
     }
   }
   const [pendingRoot, setPendingRoot] = useState<string | null>(null)
+  const [encoder, setEncoder] = useState<EncoderInfo | null>(null)
+
+  useEffect(() => {
+    unwrap(api.editor.encoder()).then(setEncoder, () => setEncoder(null))
+  }, [])
 
   async function updateSetting(patch: SettingsUpdateInput) {
     try {
@@ -216,12 +222,33 @@ export function SettingsScreen({
         <div className="setting">
           <div>
             <h3>Pasta de exportação</h3>
-            <p className="muted small">Onde as versões editadas serão gravadas (Fase 2).</p>
+            <p className="muted small">Onde as versões exportadas são gravadas, numa subpasta por projeto.</p>
             <code className="path">{info.exportDirectory}</code>
           </div>
           <button type="button" className="btn btn-ghost" onClick={changeExportFolder}>
             Mudar…
           </button>
+        </div>
+        <div className="setting">
+          <div>
+            <h3>Codificador de vídeo</h3>
+            <p className="muted small">
+              Automático usa a placa de vídeo (NVIDIA, Intel ou AMD) quando ela funciona, e o OpenH264 quando não há. Se uma
+              exportação sair com problema, force o OpenH264.
+            </p>
+            {encoder && <p className="hint">Em uso nesta máquina: {encoder.label}</p>}
+          </div>
+          <select
+            value={settings.encoderPreference}
+            onChange={async (e) => {
+              await updateSetting({ encoderPreference: e.target.value as 'auto' | 'software' })
+              unwrap(api.editor.encoder()).then(setEncoder, () => setEncoder(null))
+            }}
+            aria-label="Codificador de vídeo"
+          >
+            <option value="auto">Automático</option>
+            <option value="software">Sempre OpenH264 (software)</option>
+          </select>
         </div>
       </section>
 

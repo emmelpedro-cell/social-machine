@@ -8,11 +8,12 @@ type Props = {
   project: Project | null
   selected: boolean
   checked: boolean
+  versionCount: number
   onSelect: () => void
   onToggleCheck: (shift: boolean) => void
 }
 
-export function AssetCard({ asset, project, selected, checked, onSelect, onToggleCheck }: Props) {
+export function AssetCard({ asset, project, selected, checked, versionCount, onSelect, onToggleCheck }: Props) {
   const state = assetState(asset)
   const [thumbFailed, setThumbFailed] = useState(false)
   const showThumb = asset.hasThumbnail && !thumbFailed
@@ -68,6 +69,12 @@ export function AssetCard({ asset, project, selected, checked, onSelect, onToggl
         <span className="asset-project">
           <span className="project-dot" style={{ background: project?.color ?? 'var(--text-faint)' }} aria-hidden="true" />
           {project?.name ?? 'Sem projeto'}
+          {versionCount > 0 && (
+            <span className="version-count" data-testid="asset-versions">
+              {' '}
+              · {versionCount} {versionCount === 1 ? 'versão' : 'versões'}
+            </span>
+          )}
         </span>
       </button>
     </div>

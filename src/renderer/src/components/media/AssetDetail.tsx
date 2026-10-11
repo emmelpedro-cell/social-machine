@@ -18,16 +18,20 @@ import { formatDateTime } from '../../format'
 import { assetState, displayName, sourceUrl, STATE_LABEL } from '../../media/format'
 import type { NoticeState } from '../Notice'
 import { ProjectSelect } from '../ProjectSelect'
+import { useVersions } from '../../editor/useVersions'
+import { VersionsList } from '../../editor/VersionsList'
 
 type Props = {
   asset: ContentItem
   projects: Project[]
+  onOpenEditor: () => void
   onClose: () => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
 }
 
-export function AssetDetail({ asset, projects, onClose, onNotice, onError }: Props) {
+export function AssetDetail({ asset, projects, onOpenEditor, onClose, onNotice, onError }: Props) {
+  const { versions } = useVersions(asset.id)
   const state = assetState(asset)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [mismatch, setMismatch] = useState<string | null>(null)
@@ -174,6 +178,11 @@ export function AssetDetail({ asset, projects, onClose, onNotice, onError }: Pro
       )}
 
       <div className="row wrap">
+        {state === 'ready' && (
+          <button type="button" className="btn btn-primary" onClick={onOpenEditor} data-testid="open-editor">
+            Abrir no editor
+          </button>
+        )}
         {(state === 'missing' || state === 'ready' || state === 'error') && (
           <button type="button" className={`btn ${state === 'missing' ? 'btn-primary' : 'btn-ghost'}`} onClick={relink} data-testid="relink">
             Localizar…
@@ -224,6 +233,11 @@ export function AssetDetail({ asset, projects, onClose, onNotice, onError }: Pro
         <Fact label="Importado" value={formatDateTime(asset.importedAt)} />
         <Fact label="Publicações" value={<span className="muted">Disponível na Fase 3</span>} />
       </dl>
+
+      <section className="detail-versions">
+        <h3 className="small-heading">Versões</h3>
+        <VersionsList versions={versions} compact onNotice={onNotice} onError={onError} />
+      </section>
 
       <div className="danger-zone">
         {confirmRemove ? (

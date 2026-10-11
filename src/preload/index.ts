@@ -3,6 +3,7 @@ import type { SmApi } from '../shared/api'
 import { IpcChannels, IpcEvents, type IpcChannel } from '../shared/channels'
 import type { MediaEvent } from '../shared/media'
 import type { WatchEvent } from '../shared/watch'
+import type { VersionEvent } from '../shared/editor'
 import type { IpcResult } from '../shared/schemas'
 
 /**
@@ -81,6 +82,30 @@ const api: SmApi = {
         ipcRenderer.removeListener(IpcEvents.watch, handler)
       }
     }
+  },
+  versions: {
+    list: (contentId) => call(IpcChannels.versionsList, { contentId }),
+    create: (input) => call(IpcChannels.versionsCreate, input),
+    retry: (id) => call(IpcChannels.versionsRetry, { id }),
+    cancel: (id) => call(IpcChannels.versionsCancel, { id }),
+    remove: (id, deleteFile) => call(IpcChannels.versionsRemove, { id, deleteFile }),
+    showInFolder: (id) => call(IpcChannels.versionsShowInFolder, { id }),
+    counts: () => call(IpcChannels.versionsCounts),
+    onEvent: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: VersionEvent) => listener(payload)
+      ipcRenderer.on(IpcEvents.versions, handler)
+      return () => {
+        ipcRenderer.removeListener(IpcEvents.versions, handler)
+      }
+    }
+  },
+  presets: {
+    list: (projectId) => call(IpcChannels.presetsList, { projectId }),
+    save: (input) => call(IpcChannels.presetsSave, input),
+    delete: (id) => call(IpcChannels.presetsDelete, { id })
+  },
+  editor: {
+    encoder: () => call(IpcChannels.editorEncoder)
   },
   settings: {
     get: () => call(IpcChannels.settingsGet),

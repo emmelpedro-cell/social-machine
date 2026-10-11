@@ -24,6 +24,11 @@ import { WatchFoldersRepository } from './repositories/watch-folders'
 import { createSenderValidator } from './security'
 import { TRAY_ICON_16, TRAY_ICON_32 } from './tray-icon'
 import { WatchService } from './watch/watch-service'
+import type { VersionEvent } from '../shared/editor'
+import { EncoderSelector } from './editor/encoders'
+import { RenderService } from './editor/render-service'
+import { PresetsRepository } from './repositories/presets'
+import { VersionsRepository } from './repositories/versions'
 
 const APP_NAME = 'Social Machine'
 const isDev = !app.isPackaged
@@ -45,6 +50,7 @@ let db: SqlDriver | null = null
 let logger: Logger | null = null
 let importService: ImportService | null = null
 let watchService: WatchService | null = null
+let renderService: RenderService | null = null
 let settingsRepo: SettingsRepository | null = null
 let quitting = false
 let trayHintShown = false
@@ -86,6 +92,8 @@ function start(): void {
   settingsRepo = settings
   const contents = new ContentsRepository(opened.db)
   const watchFolders = new WatchFoldersRepository(opened.db)
+  const versions = new VersionsRepository(opened.db)
+  const presets = new PresetsRepository(opened.db)
 
   // ---- Media -----------------------------------------------------------
   const toolsLocation = resolveMediaTools({
@@ -127,8 +135,40 @@ function start(): void {
   })
   watchService = watcher
 
+  // ---- Editor: rendering versions --------------------------------------
+  const encoders = new EncoderSelector(() => tools.require(), log.child('encoder'))
+  const renderer = new RenderService({
+    versions,
+    contents,
+    projectName: (id) => {
+      if (!id) return null
+      try {
+        return projects.get(id).name
+      } catch {
+        return null
+      }
+    },
+    getTools: () => tools.require(),
+    encoders,
+    encoderPreference: () => settings.get().encoderPreference,
+    exportsDirectory: () => settings.get().exportDirectory ?? layout.defaultExports,
+    versionsDirectory: layout.versions,
+    thumbnailsDirectory: layout.thumbnails,
+    tempDirectory: layout.temp,
+    logger: log.child('render'),
+    emit: sendVersionEvent,
+    onVersionCreated: (contentId) => {
+      // Making a version means the clip is being worked on.
+      const content = contents.find(contentId)
+      if (content && (content.workflowStatus === 'imported' || content.workflowStatus === 'needs_review')) {
+        service.announce(contents.setWorkflowStatus([contentId], 'editing'))
+      }
+    }
+  })
+  renderService = renderer
+
   protocol.handle(MEDIA_SCHEME, (request) =>
-    handleMediaRequest(request, { repo: contents, thumbnailsDirectory: layout.thumbnails })
+    handleMediaRequest(request, { repo: contents, thumbnailsDirectory: layout.thumbnails, versions })
   )
 
   hardenSessions()
@@ -226,6 +266,17 @@ function start(): void {
         if (error) throw new NotFoundError(`Não foi possível abrir a pasta: ${error}`)
       }
     },
+    editor: {
+      versions,
+      presets,
+      renderer,
+      encoder: () => encoders.select(settings.get().encoderPreference),
+      showVersionInFolder: (path) => {
+        if (existsSync(path)) shell.showItemInFolder(path)
+        else if (existsSync(dirname(path))) void shell.openPath(dirname(path))
+        else throw new NotFoundError('O arquivo dessa versão não existe mais.')
+      }
+    },
     onSettingsChanged: () => applyOsSettings()
   })
 
@@ -244,6 +295,7 @@ function start(): void {
   if (startHidden) log.info('Started hidden in the tray (launched at login)')
 
   service.start()
+  void renderer.start().catch((error) => log.error('Render recovery failed', { error }))
   // Reconciliation: files created while the app was closed are found here.
   void watcher.start().catch((error) => log.error('Folder watching failed to start', { error }))
 
@@ -352,6 +404,10 @@ async function pickFolder(title: string): Promise<string | null> {
 
 function sendMediaEvent(event: MediaEvent): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IpcEvents.media, event)
+}
+
+function sendVersionEvent(event: VersionEvent): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IpcEvents.versions, event)
 }
 
 function sendWatchEvent(event: WatchEvent): void {
@@ -468,6 +524,8 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   try {
     watchService?.stop()
+    // Unfinished renders are marked as interrupted on the next start.
+    renderService?.shutdown()
     // Stop FFmpeg child processes; unfinished imports resume on the next start.
     importService?.shutdown()
     tray?.destroy()

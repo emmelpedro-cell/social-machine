@@ -36,6 +36,17 @@ export const IpcChannels = {
   watchRemove: 'watch:remove',
   watchScanNow: 'watch:scan-now',
   watchOpenFolder: 'watch:open-folder',
+  versionsList: 'versions:list',
+  versionsCreate: 'versions:create',
+  versionsRetry: 'versions:retry',
+  versionsCancel: 'versions:cancel',
+  versionsRemove: 'versions:remove',
+  versionsShowInFolder: 'versions:show-in-folder',
+  versionsCounts: 'versions:counts',
+  presetsList: 'presets:list',
+  presetsSave: 'presets:save',
+  presetsDelete: 'presets:delete',
+  editorEncoder: 'editor:encoder',
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
   settingsChooseDataDirectory: 'settings:choose-data-directory',
@@ -50,5 +61,6 @@ export const ALL_IPC_CHANNELS: readonly IpcChannel[] = Object.values(IpcChannels
 /** Main → renderer push channels (not invokable from the renderer). */
 export const IpcEvents = {
   media: 'media:event',
-  watch: 'watch:event'
+  watch: 'watch:event',
+  versions: 'versions:event'
 } as const

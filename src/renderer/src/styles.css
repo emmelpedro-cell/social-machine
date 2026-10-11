@@ -1,5 +1,33 @@
 /* Social Machine — dark, restrained studio UI. Accent is user-configurable via --accent. */
 
+/* Editor fonts, bundled under the SIL Open Font License (see fonts/licenses).
+   Single-weight faces declare a weight range so the browser never fakes bold. */
+@font-face {
+  font-family: 'Montserrat';
+  src: url('./fonts/Montserrat-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: 'Oswald';
+  src: url('./fonts/Oswald-Variable.ttf') format('truetype');
+  font-weight: 200 700;
+}
+@font-face {
+  font-family: 'Anton';
+  src: url('./fonts/Anton-Regular.ttf') format('truetype');
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('./fonts/BebasNeue-Regular.ttf') format('truetype');
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: 'Bangers';
+  src: url('./fonts/Bangers-Regular.ttf') format('truetype');
+  font-weight: 100 900;
+}
+
 :root {
   --accent: #3d8bfd;
   --bg: #0e1014;
@@ -1666,4 +1694,357 @@ textarea {
   font: inherit;
   color: inherit;
   resize: vertical;
+}
+
+/* ------------------------------------------------------------------ */
+/* Editor                                                             */
+/* ------------------------------------------------------------------ */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 28px;
+  min-height: 100%;
+}
+.editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+.editor-title {
+  font-size: 22px;
+}
+.editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1150px) {
+  .editor-body {
+    grid-template-columns: 1fr;
+  }
+}
+.editor-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.stage-wrap {
+  display: flex;
+  justify-content: center;
+  background: repeating-conic-gradient(#14161b 0% 25%, #101216 0% 50%) 50% / 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  height: min(62vh, 640px);
+}
+.stage {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  background: #000;
+  container-type: size;
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 45%);
+}
+.stage:active {
+  cursor: grabbing;
+}
+.stage-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Matches the export: gblur sigma 40 at 1080 px ≈ 3.7 % of the width, then darkened. */
+  filter: blur(3.7cqw) brightness(0.85);
+  transform: scale(1.12);
+  pointer-events: none;
+}
+.stage-fg {
+  position: absolute;
+  object-fit: fill;
+  pointer-events: none;
+}
+.stage-text {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.safe-areas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.safe-zone {
+  position: absolute;
+  background: rgb(229 72 77 / 18%);
+  outline: 1px dashed rgb(229 72 77 / 70%);
+  outline-offset: -1px;
+}
+.editor-transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.trim {
+  display: grid;
+  gap: 4px;
+}
+.trim-bar {
+  position: relative;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  touch-action: none;
+}
+.trim-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+.trim-handle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 12px;
+  margin-left: -6px;
+  border-radius: 4px;
+  background: var(--accent);
+  cursor: ew-resize;
+}
+.trim-playhead {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  pointer-events: none;
+}
+.trim-labels {
+  display: flex;
+  justify-content: space-between;
+}
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.editor-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+.segmented.tabs {
+  display: flex;
+}
+.segmented.tabs button {
+  flex: 1;
+}
+.slider {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.slider-head {
+  display: flex;
+  justify-content: space-between;
+}
+.slider input,
+.text-editor input[type='range'] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+.slider.is-disabled {
+  opacity: 0.45;
+}
+.text-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.text-chip {
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg-input);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.text-chip.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.text-editor {
+  display: grid;
+  gap: 10px;
+}
+.text-editor .swatches {
+  align-items: center;
+}
+.text-editor input[type='color'],
+.editor-section input[type='color'] {
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: none;
+}
+.preset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.preset-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.preset-list .icon-btn {
+  margin-left: auto;
+}
+.preset-save {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+/* Versions */
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.version-item {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  display: grid;
+  gap: 8px;
+}
+.version-item.status-error {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
+}
+.version-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.version-thumb {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #0a0a0c;
+}
+.version-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.version-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.version-name {
+  font-size: 13px;
+}
+.version-player {
+  width: 100%;
+  max-height: 360px;
+  background: #000;
+  border-radius: 4px;
+}
+.version-actions .btn {
+  padding: 3px 8px;
+}
+.detail-versions {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+.version-count {
+  color: var(--accent);
+}
+
+/* Editor picker */
+.picker-grid {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+.picker-item {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+}
+.picker-item:hover {
+  border-color: var(--accent);
+}
+.picker-item > span {
+  padding: 0 10px;
+}
+.picker-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  background: #0a0a0c;
+  padding: 0 !important;
+}
+.picker-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.picker-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

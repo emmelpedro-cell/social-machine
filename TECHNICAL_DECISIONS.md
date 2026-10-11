@@ -55,6 +55,28 @@ TD-001 to TD-020 come from the Music Content Engine, whose Phase 1 code is the b
 **Decision:** the interface and user-facing error messages are in Brazilian Portuguese. Code, logs and technical documents stay in English.
 **Why:** the user works in Portuguese; logs and code are read by developers and tools.
 
+### TD-108 — Text is drawn by the editor, exported as images (WYSIWYG)
+
+**Decision:** text overlays are drawn with Canvas 2D by one function (`renderer/src/editor/textRender.ts`). The preview calls it on a canvas over the video; on export it draws each text alone on a transparent canvas at the output size, and the PNGs are sent to the main process, validated (PNG signature, exact output size, size limit) and overlaid by FFmpeg, enabled during the text's time range.
+**Alternatives:** FFmpeg `drawtext` (available, via libfreetype) or ASS subtitles via libass (not in the LGPL build).
+**Why:** the preview and the file use the same font rasterizer, wrapping, outline and shadow code, so they can't drift apart; `drawtext` would need its own font files, line wrapping and outline logic re-implemented in filter syntax, and would still not match Chromium's rendering. The images are stored per version (`app-data/versions/<id>/`) so a failed render can be retried without the editor.
+**Limits:** text is static during its time range (no per-word animation yet; spec lists word highlighting as future work, which fits this approach as image sequences or per-word images).
+
+### TD-109 — H.264 encoder: hardware when it works, OpenH264 otherwise
+
+**Decision:** on first export the app test-encodes a few frames with, in order, NVENC, Quick Sync, AMF, Media Foundation and OpenH264, and uses the first that works (cached). If a hardware encoder fails on a real render, that render is retried once with OpenH264. Settings → "Codificador de vídeo" can force OpenH264. Bitrate scales with pixel rate: about 10 Mbit/s for 1080×1920 at 30 fps (2–20 Mbit/s bounds). Audio is AAC 192 kbit/s stereo.
+**Why:** this resolves TD-012's open question without switching to a GPL build: hardware encoders give good quality per bitrate and speed where present; OpenH264 is always available in the LGPL build and, at these bitrates, adequate for short-form platforms, which re-encode uploads anyway. Listing an encoder doesn't mean it works (no GPU, old driver), hence the test encode.
+
+### TD-110 — Versions: export folder per project, atomic output, verified
+
+**Decision:** a version is written to `<export folder>/<project or "Sem projeto">/<title> - <version name>.mp4` (Windows-safe names, never overwriting: " (2)" etc.). FFmpeg writes `….mp4.part`; the result is checked with FFprobe (readable, exact size, duration within 5 %) before it is renamed and marked ready, and a thumbnail is made. Renders run one at a time; cancelling removes the unfinished version; a render interrupted by quitting is marked failed with "Tentar de novo". Deleting a version keeps its file unless the user chooses "Excluir versão e arquivo"; a version used by a publication (Phase 3) can't be deleted. Making a version moves a content from "Importado"/"Precisa de revisão" to "Em edição".
+**Why:** exported files are what the user uploads, so they belong in a visible folder, organised by project. The `.part` name keeps half-written files from looking finished (and from being imported if someone watches the export folder: `.part` is ignored by TD-104).
+
+### TD-111 — Bundled editor fonts
+
+**Decision:** Montserrat, Oswald (variable), Anton, Bebas Neue and Bangers are bundled with the renderer under the SIL Open Font License 1.1 (texts in `src/renderer/src/fonts/licenses`, shipped as `resources/font-licenses`). Arial Black, Impact, Segoe UI and Georgia are offered from Windows. Single-weight faces declare a weight range so the browser never synthesizes bold.
+**Why:** short-form video relies on a few heavy display faces; bundling guarantees they exist on every machine. Because text is rasterized by the app (TD-108), fonts never need to be passed to FFmpeg.
+
 ## Inherited decisions (Music Content Engine)
 
 ## TD-001 — electron-vite as the build tool
@@ -177,7 +199,7 @@ Additionally, every call checks `event.senderFrame.url` against the app's own pa
 
 ## Open decisions
 
-- **H.264 export encoder** (Phase 2, editor): OpenH264 vs. hardware encoders vs. a GPL build with libx264 (see TD-012). Short-form platforms re-encode uploads, but quality per bitrate still matters; measure before deciding.
+- **Export quality check** (Phase 2 follow-up): compare OpenH264 at 10 Mbit/s with the hardware encoders on real footage; raise the software bitrate if needed (TD-109).
 - **Token storage** (Phase 3): Electron `safeStorage` (DPAPI on Windows) in a file next to the database vs. Windows Credential Manager (keytar is unmaintained).
 - **Platform APIs** (before Phase 3): verify current YouTube Data API quota and audit rules, TikTok Content Posting API audit requirements (unaudited clients may only post privately), and Instagram Graph API account requirements against the official documentation at that time.
 - **Scheduler** (Phase 4): in-process timer with the `tasks` table vs. a helper process; how missed schedules are handled after the computer was off.

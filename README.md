@@ -4,7 +4,7 @@ Central local de conteúdo para vídeos curtos: biblioteca, organização por pr
 
 Windows 10/11, local-first. Electron + React + TypeScript + Vite, SQLite (better-sqlite3), FFmpeg 9 (LGPL) incluído.
 
-**Estado atual: Fase 1 (base funcional).** Projetos, biblioteca de vídeos com metadados reais, importação manual, monitoramento da pasta de saída da Drop Machine com execução na área de notificação, e o banco já preparado para versões, contas, publicações, métricas, inbox e tarefas. Veja [`PROJECT_STATUS.md`](PROJECT_STATUS.md) para o que foi validado e o que ainda falta. O plano completo está em [`docs/SPEC.md`](docs/SPEC.md).
+**Estado atual: Fase 2 (editor).** Projetos, biblioteca de vídeos com metadados reais, importação manual, monitoramento da pasta de saída da Drop Machine com execução na área de notificação, e um editor que exporta versões (corte, proporção, enquadramento, textos, presets) sem nunca alterar o original. O banco já está preparado para contas, publicações, métricas, inbox e tarefas. Veja [`PROJECT_STATUS.md`](PROJECT_STATUS.md) para o que foi validado e o que ainda falta. O plano completo está em [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Requisitos
 
@@ -57,6 +57,20 @@ Em **Projetos**, crie um projeto por nicho (ou use **Criar MMA, Futebol, Basquet
 - O mesmo vídeo não entra duas vezes: nem pelo caminho, nem como cópia com outro nome. Um arquivo **renomeado** é reconhecido pelo conteúdo e o item existente passa a apontar para o novo nome, mantendo projeto e status.
 - Arquivo movido aparece como **Arquivo ausente** e mantém os metadados. Use **Localizar…** ou **Procurar numa pasta…**.
 
+### Editor
+
+Na Biblioteca, abra um vídeo e clique em **Abrir no editor** (ou use **Editor** no menu e escolha um vídeo).
+
+- **Formato:** proporção 9:16 (1080×1920), 16:9, 1:1, 4:5 ou original. **Preencher** corta as bordas; **Mostrar tudo** mostra o vídeo inteiro com fundo desfocado ou preto. Zoom e posição pelos controles ou **arrastando o vídeo na prévia**.
+- **Corte:** arraste as alças da barra, ou use **Início aqui** / **Fim aqui** na posição atual. Espaço reproduz e pausa (a prévia repete o trecho cortado).
+- **Textos:** vários por vídeo, com fonte (Montserrat, Anton, Bebas Neue, Oswald, Bangers incluídas, mais Arial Black, Impact, Segoe UI e Georgia do Windows), tamanho, negrito, maiúsculas, cor, contorno, sombra, caixa de fundo, alinhamento e tempo de exibição. Arraste o texto na prévia para posicioná-lo.
+- **Guias:** no 9:16, a prévia mostra (aproximadamente) as áreas cobertas pela interface do TikTok, Reels ou Shorts.
+- **A prévia é o resultado:** o texto é desenhado pelo mesmo código na prévia e no vídeo exportado.
+- **Exportar versão:** cria uma versão com nome (Versão A, B…) em `exports\<projeto>\<título> - <versão>.mp4`, em H.264 + AAC. A exportação roda em segundo plano, com progresso e cancelamento. O arquivo é conferido com o FFprobe antes de ficar pronto. O original nunca é alterado.
+- **Versões:** listadas no editor e no painel do vídeo na Biblioteca, com **Assistir**, **Mostrar na pasta**, **Editar como nova**, **Tentar de novo** e **Excluir** (com ou sem o arquivo).
+- **Presets:** salve proporção, enquadramento e estilo dos textos para o projeto ou para todos, e aplique em outros vídeos.
+- **Codificador:** usa a placa de vídeo (NVIDIA, Intel ou AMD) quando ela funciona e o OpenH264 quando não há. Dá para forçar o OpenH264 em Configurações.
+
 ### Pasta da Drop Machine
 
 Em **Configurações → Pastas monitoradas**, use **Adicionar pasta da Drop Machine…** e escolha a pasta de saída (normalmente `C:\drop-machine\public\output`). Escolha também o projeto que os vídeos novos devem receber.
@@ -100,8 +114,9 @@ SocialMachine\
 │   ├── logs\app.log         JSON por linha, rotação a cada 5 MB (3 arquivos)
 │   ├── thumbnails\          miniaturas (um JPEG por vídeo)
 │   ├── temp\                arquivos de trabalho; sobras são apagadas ao iniciar
-│   └── projects, proxies, versions, presets\   (próximas fases)
-└── exports\                 pasta de exportação padrão
+│   ├── versions\            imagens dos textos de cada versão (para refazer uma exportação)
+│   └── projects, proxies, presets\   (próximas fases)
+└── exports\                 versões exportadas, uma subpasta por projeto
 ```
 
 - Mude a pasta de dados em **Configurações → Armazenamento** (vale depois de reiniciar; os dados atuais não são movidos).
@@ -124,6 +139,7 @@ src/
 │   ├── ipc/       tabela de handlers validados
 │   ├── media/     FFmpeg, probe, miniaturas, fila de importação, protocolo sm-media://
 │   ├── watch/     monitoramento de pastas (eventos + varredura + estabilidade)
+│   ├── editor/    plano de renderização FFmpeg, escolha do codificador, fila de exportação
 │   ├── repositories/  projetos, conteúdos, pastas monitoradas, configurações
 │   └── index.ts   janela, bandeja, instância única, iniciar com o Windows
 ├── preload/       a única ponte com a interface (window.sm)

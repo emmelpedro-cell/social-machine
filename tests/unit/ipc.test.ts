@@ -16,6 +16,10 @@ import { SettingsRepository } from '../../src/main/repositories/settings'
 import { createSenderValidator } from '../../src/main/security'
 import { WatchFoldersRepository } from '../../src/main/repositories/watch-folders'
 import { WatchService } from '../../src/main/watch/watch-service'
+import { EncoderSelector, SOFTWARE_ENCODER } from '../../src/main/editor/encoders'
+import { RenderService } from '../../src/main/editor/render-service'
+import { PresetsRepository } from '../../src/main/repositories/presets'
+import { VersionsRepository } from '../../src/main/repositories/versions'
 import { createNodeSqliteDriver, memoryLogger } from '../helpers/node-sqlite-driver'
 
 function setup() {
@@ -33,6 +37,24 @@ function setup() {
     emit: () => {},
     scanIntervalMs: () => 60_000,
     watchFactory: () => ({ close: () => {} })
+  })
+  const versions = new VersionsRepository(db)
+  const noTools = async () => {
+    throw new UnavailableError('FFmpeg is missing (test).')
+  }
+  const renderer = new RenderService({
+    versions,
+    contents: mediaRepo,
+    projectName: () => null,
+    getTools: noTools,
+    encoders: new EncoderSelector(noTools, logger),
+    encoderPreference: () => 'software',
+    exportsDirectory: () => '/nonexistent/exports',
+    versionsDirectory: '/nonexistent/versions',
+    thumbnailsDirectory: '/nonexistent/thumbs',
+    tempDirectory: '/nonexistent/temp',
+    logger,
+    emit: () => {}
   })
   const table = buildHandlers({
     projects: new ProjectsRepository(db),
@@ -69,6 +91,13 @@ function setup() {
       service: watchService,
       addWithDialog: async () => ({ cancelled: true }),
       openFolder: async () => {}
+    },
+    editor: {
+      versions,
+      presets: new PresetsRepository(db),
+      renderer,
+      encoder: async () => SOFTWARE_ENCODER,
+      showVersionInFolder: () => {}
     }
   })
   const call = <T>(channel: keyof HandlerTable, input?: unknown) =>
@@ -138,7 +167,13 @@ describe('IPC handlers', () => {
       [IpcChannels.watchUpdate, { id: '00000000-0000-4000-8000-000000000000', path: 'C:\\' }],
       [IpcChannels.watchRemove, { id: 'x' }],
       [IpcChannels.settingsUpdate, { watchScanIntervalSeconds: 1 }],
-      [IpcChannels.settingsUpdate, { launchAtLogin: 'yes' }]
+      [IpcChannels.settingsUpdate, { launchAtLogin: 'yes' }],
+      [IpcChannels.settingsUpdate, { encoderPreference: 'gpu' }],
+      [IpcChannels.versionsCreate, { contentId: '00000000-0000-4000-8000-000000000000', name: 'x', settings: {}, overlays: [] }],
+      [IpcChannels.versionsCreate, { contentId: 'nope', name: 'x', settings: {}, overlays: [] }],
+      [IpcChannels.versionsRemove, { id: '00000000-0000-4000-8000-000000000000' }],
+      [IpcChannels.presetsSave, { projectId: null, name: '', settings: {} }],
+      [IpcChannels.presetsList, {}]
     ]
     for (const [channel, input] of cases) {
       const result = await ctx.call(channel, input)
@@ -210,6 +245,16 @@ describe('IPC handlers', () => {
     const empty = await ctx.call<WatchFolderStatus[]>(IpcChannels.watchList)
     expect(empty.ok && empty.data).toEqual([])
     ctx.watchService.stop()
+  })
+
+  it('saves and lists editing presets, and reports the encoder', async () => {
+    const settings = { version: 1, output: { preset: '9:16' }, frame: { fit: 'cover', zoom: 1, x: 0, y: 0, background: 'blur' }, texts: [], audio: { mute: false } }
+    const saved = await ctx.call<{ id: string; name: string }>(IpcChannels.presetsSave, { projectId: null, name: 'Limpo', settings })
+    expect(saved.ok && saved.data.name).toBe('Limpo')
+    const listed = await ctx.call<{ name: string }[]>(IpcChannels.presetsList, { projectId: null })
+    expect(listed.ok && listed.data.map((p) => p.name)).toEqual(['Limpo'])
+    expect(await ctx.call(IpcChannels.editorEncoder)).toMatchObject({ ok: true, data: { id: 'libopenh264' } })
+    expect(await ctx.call(IpcChannels.versionsCounts)).toEqual({ ok: true, data: {} })
   })
 
   it('updates settings through the allowed keys only', async () => {

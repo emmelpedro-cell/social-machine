@@ -30,6 +30,8 @@ export type RunOptions = {
   /** Only the tail of stderr is kept, for diagnostics. */
   maxStderrBytes?: number
   cwd?: string
+  /** Receives stdout line by line instead of collecting it (e.g. FFmpeg -progress output). */
+  onStdoutLine?: (line: string) => void
 }
 
 export type RunResult = { stdout: string; stderr: string }
@@ -93,7 +95,14 @@ export function runProcess(file: string, args: readonly string[], options: RunOp
       timeoutMs
     )
 
+    let pendingLine = ''
     child.stdout?.on('data', (chunk: Buffer) => {
+      if (options.onStdoutLine) {
+        const lines = (pendingLine + chunk.toString('utf8')).split(/\r?\n/)
+        pendingLine = lines.pop() ?? ''
+        for (const line of lines) options.onStdoutLine(line)
+        return
+      }
       stdoutBytes += chunk.length
       if (stdoutBytes > maxStdoutBytes) {
         kill(new ProcessError('OUTPUT_LIMIT', 'The program produced more output than expected'))

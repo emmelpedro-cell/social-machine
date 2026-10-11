@@ -103,7 +103,9 @@ export const DEFAULT_SETTINGS = {
   /** Start with Windows, hidden in the tray. */
   launchAtLogin: false,
   /** Full rescan of watched folders, as a safety net for missed file-system events. */
-  watchScanIntervalSeconds: 60
+  watchScanIntervalSeconds: 60,
+  /** 'auto' uses a hardware H.264 encoder when one works; 'software' always uses OpenH264. */
+  encoderPreference: 'auto' as 'auto' | 'software'
 }
 
 export const SettingsSchema = z.object({
@@ -111,7 +113,8 @@ export const SettingsSchema = z.object({
   exportDirectory: z.string().min(1).nullable(),
   minimizeToTray: z.boolean(),
   launchAtLogin: z.boolean(),
-  watchScanIntervalSeconds: z.number().int().min(15).max(3600)
+  watchScanIntervalSeconds: z.number().int().min(15).max(3600),
+  encoderPreference: z.enum(['auto', 'software'])
 })
 export type Settings = z.infer<typeof SettingsSchema>
 
@@ -121,7 +124,8 @@ export const SettingsUpdateInputSchema = z
     accentColor: SettingsSchema.shape.accentColor.optional(),
     minimizeToTray: SettingsSchema.shape.minimizeToTray.optional(),
     launchAtLogin: SettingsSchema.shape.launchAtLogin.optional(),
-    watchScanIntervalSeconds: SettingsSchema.shape.watchScanIntervalSeconds.optional()
+    watchScanIntervalSeconds: SettingsSchema.shape.watchScanIntervalSeconds.optional(),
+    encoderPreference: SettingsSchema.shape.encoderPreference.optional()
   })
   .strict()
 export type SettingsUpdateInput = z.infer<typeof SettingsUpdateInputSchema>

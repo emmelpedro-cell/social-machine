@@ -3,12 +3,15 @@ import { stat } from 'node:fs/promises'
 import { extname, isAbsolute, relative } from 'node:path'
 import { Readable } from 'node:stream'
 import type { ContentsRepository } from '../repositories/contents'
+import type { VersionsRepository } from '../repositories/versions'
 
 /**
  * sm-media:// serves library media to the renderer for preview:
  *
  *   sm-media://asset/<id>   the source file, with HTTP range support (seeking)
  *   sm-media://thumb/<id>   the generated thumbnail
+ *   sm-media://version/<id> an exported version (only once it is ready)
+ *   sm-media://vthumb/<id>  a version's thumbnail
  *
  * Only ids that exist in the database can be requested; the renderer can
  * never ask for an arbitrary file path.
@@ -81,29 +84,46 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function handleMediaRequest(
   request: MediaRequest,
-  deps: { repo: ContentsRepository; thumbnailsDirectory: string }
+  deps: { repo: ContentsRepository; thumbnailsDirectory: string; versions?: VersionsRepository }
 ): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405 })
   const url = new URL(request.url)
   const id = url.pathname.replace(/^\//, '')
   if (!UUID.test(id)) return new Response(null, { status: 400 })
 
-  let record
-  try {
-    record = deps.repo.record(id)
-  } catch {
-    return new Response(null, { status: 404 })
+  const insideThumbnails = (p: string) => {
+    const rel = relative(deps.thumbnailsDirectory, p)
+    return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel)
   }
 
   let path: string
-  if (url.host === 'asset') {
-    path = record.sourcePath
-  } else if (url.host === 'thumb') {
-    if (!record.thumbnailPath) return new Response(null, { status: 404 })
-    const rel = relative(deps.thumbnailsDirectory, record.thumbnailPath)
-    if (!rel || rel.startsWith('..') || isAbsolute(rel)) return new Response(null, { status: 403 })
-    path = record.thumbnailPath
-  } else {
+  let isThumb = false
+  try {
+    if (url.host === 'asset' || url.host === 'thumb') {
+      const record = deps.repo.record(id)
+      if (url.host === 'asset') {
+        path = record.sourcePath
+      } else {
+        if (!record.thumbnailPath) return new Response(null, { status: 404 })
+        if (!insideThumbnails(record.thumbnailPath)) return new Response(null, { status: 403 })
+        path = record.thumbnailPath
+        isThumb = true
+      }
+    } else if ((url.host === 'version' || url.host === 'vthumb') && deps.versions) {
+      const version = deps.versions.record(id)
+      if (url.host === 'version') {
+        if (version.status !== 'ready' || !version.filePath) return new Response(null, { status: 404 })
+        path = version.filePath
+      } else {
+        if (!version.thumbnailPath) return new Response(null, { status: 404 })
+        if (!insideThumbnails(version.thumbnailPath)) return new Response(null, { status: 403 })
+        path = version.thumbnailPath
+        isThumb = true
+      }
+    } else {
+      return new Response(null, { status: 404 })
+    }
+  } catch {
     return new Response(null, { status: 404 })
   }
 
@@ -117,7 +137,7 @@ export async function handleMediaRequest(
   }
 
   const headers = new Headers({
-    'Content-Type': url.host === 'thumb' ? 'image/jpeg' : mimeTypeFor(path),
+    'Content-Type': isThumb ? 'image/jpeg' : mimeTypeFor(path),
     'Accept-Ranges': 'bytes',
     'Cache-Control': 'no-cache'
   })

@@ -30,7 +30,18 @@ import {
   type AddWatchFolderResult,
   type WatchOrigin
 } from '../../shared/watch'
+import {
+  ContentIdInputSchema,
+  PresetIdInputSchema,
+  RenderVersionInputSchema,
+  SavePresetInputSchema,
+  VersionIdInputSchema,
+  type EncoderInfo
+} from '../../shared/editor'
 import { NotFoundError } from '../errors'
+import type { RenderService } from '../editor/render-service'
+import type { PresetsRepository } from '../repositories/presets'
+import type { VersionsRepository } from '../repositories/versions'
 import type { Logger } from '../logger'
 import type { ImportService } from '../media/import-service'
 import type { ContentsRepository } from '../repositories/contents'
@@ -68,6 +79,13 @@ export type HandlerDeps = {
     addWithDialog: (origin: WatchOrigin, projectId: string | null) => Promise<AddWatchFolderResult>
     openFolder: (path: string) => Promise<void>
   }
+  editor: {
+    versions: VersionsRepository
+    presets: PresetsRepository
+    renderer: RenderService
+    encoder: () => Promise<EncoderInfo>
+    showVersionInFolder: (path: string) => void
+  }
   onSettingsChanged?: () => void
 }
 
@@ -76,7 +94,7 @@ export type HandlerDeps = {
 export type HandlerTable = Record<IpcChannel, HandlerDefinition<any, any>>
 
 export function buildHandlers(deps: HandlerDeps): HandlerTable {
-  const { media, watch } = deps
+  const { media, watch, editor } = deps
   const assertProject = (projectId: string | null | undefined) => {
     if (projectId && !deps.projects.exists(projectId)) {
       throw new NotFoundError('Esse projeto não existe mais. Escolha outro.')
@@ -295,6 +313,68 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
         await watch.openFolder(watch.repo.get(id).path)
         return null
       }
+    }),
+
+    [IpcChannels.versionsList]: defineHandler({
+      schema: ContentIdInputSchema,
+      handle: ({ contentId }) => editor.versions.listForContent(contentId)
+    }),
+    [IpcChannels.versionsCreate]: defineHandler({
+      schema: RenderVersionInputSchema,
+      handle: (input) => editor.renderer.create(input)
+    }),
+    [IpcChannels.versionsRetry]: defineHandler({
+      schema: VersionIdInputSchema,
+      handle: ({ id }) => editor.renderer.retry(id)
+    }),
+    [IpcChannels.versionsCancel]: defineHandler({
+      schema: VersionIdInputSchema,
+      handle: async ({ id }) => {
+        await editor.renderer.cancel(id)
+        return null
+      }
+    }),
+    [IpcChannels.versionsRemove]: defineHandler({
+      schema: z.object({ id: z.string().uuid('Versão inválida'), deleteFile: z.boolean() }).strict(),
+      handle: async ({ id, deleteFile }) => {
+        await editor.renderer.remove(id, deleteFile)
+        return null
+      }
+    }),
+    [IpcChannels.versionsShowInFolder]: defineHandler({
+      schema: VersionIdInputSchema,
+      handle: ({ id }) => {
+        const version = editor.versions.get(id)
+        if (!version.filePath) throw new NotFoundError('Essa versão não tem arquivo.')
+        editor.showVersionInFolder(version.filePath)
+        return null
+      }
+    }),
+    [IpcChannels.versionsCounts]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => Object.fromEntries(editor.versions.countsByContent())
+    }),
+    [IpcChannels.presetsList]: defineHandler({
+      schema: z.object({ projectId: z.string().uuid('Projeto inválido').nullable() }).strict(),
+      handle: ({ projectId }) => editor.presets.list(projectId)
+    }),
+    [IpcChannels.presetsSave]: defineHandler({
+      schema: SavePresetInputSchema,
+      handle: (input) => {
+        assertProject(input.projectId)
+        return editor.presets.save(input)
+      }
+    }),
+    [IpcChannels.presetsDelete]: defineHandler({
+      schema: PresetIdInputSchema,
+      handle: ({ id }) => {
+        editor.presets.delete(id)
+        return null
+      }
+    }),
+    [IpcChannels.editorEncoder]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => editor.encoder()
     }),
 
     [IpcChannels.settingsGet]: defineHandler({

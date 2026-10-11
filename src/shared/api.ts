@@ -11,6 +11,14 @@ import type {
   UpdateProjectInput
 } from './schemas'
 import type {
+  ContentVersion,
+  EditPreset,
+  EncoderInfo,
+  RenderVersionInput,
+  SavePresetInput,
+  VersionEvent
+} from './editor'
+import type {
   AddWatchFolderResult,
   UpdateWatchFolderInput,
   WatchEvent,
@@ -84,6 +92,28 @@ export interface SmApi {
     scanNow(id?: string): Promise<IpcResult<WatchFolderStatus[]>>
     openFolder(id: string): Promise<IpcResult<null>>
     onEvent(listener: (event: WatchEvent) => void): () => void
+  }
+  versions: {
+    list(contentId: string): Promise<IpcResult<ContentVersion[]>>
+    /** Queues a render. Text overlays are PNGs drawn by the editor at output size. */
+    create(input: RenderVersionInput): Promise<IpcResult<ContentVersion>>
+    retry(id: string): Promise<IpcResult<ContentVersion>>
+    cancel(id: string): Promise<IpcResult<null>>
+    /** Deletes a version; its exported file only when deleteFile is true. */
+    remove(id: string, deleteFile: boolean): Promise<IpcResult<null>>
+    showInFolder(id: string): Promise<IpcResult<null>>
+    /** Number of versions per content id. */
+    counts(): Promise<IpcResult<Record<string, number>>>
+    onEvent(listener: (event: VersionEvent) => void): () => void
+  }
+  presets: {
+    list(projectId: string | null): Promise<IpcResult<EditPreset[]>>
+    save(input: SavePresetInput): Promise<IpcResult<EditPreset>>
+    delete(id: string): Promise<IpcResult<null>>
+  }
+  editor: {
+    /** The H.264 encoder exports will use on this machine. */
+    encoder(): Promise<IpcResult<EncoderInfo>>
   }
   settings: {
     get(): Promise<IpcResult<Settings>>

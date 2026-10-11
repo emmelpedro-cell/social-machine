@@ -23,10 +23,10 @@ export function Sidebar({ current, onNavigate, version, needsReview }: Props) {
   const main: Item[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'library', label: 'Biblioteca', badge: needsReview },
+    { id: 'editor', label: 'Editor' },
     { id: 'projects', label: 'Projetos' }
   ]
   const later: Item[] = [
-    { id: 'editor', label: 'Editor', phase: 2 },
     { id: 'accounts', label: 'Contas', phase: 3 },
     { id: 'queue', label: 'Fila', phase: 4 },
     { id: 'calendar', label: 'Calendário', phase: 4 },
@@ -85,7 +85,7 @@ export function Sidebar({ current, onNavigate, version, needsReview }: Props) {
         >
           Configurações
         </button>
-        <p className="build-tag">Fase 1 · base{version ? ` · v${version}` : ''}</p>
+        <p className="build-tag">Fase 2 · editor{version ? ` · v${version}` : ''}</p>
       </div>
     </nav>
   )

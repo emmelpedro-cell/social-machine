@@ -13,6 +13,9 @@ import { LibraryScreen, type LibraryFilters } from './screens/LibraryScreen'
 import { ProjectsScreen } from './screens/ProjectsScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { PhasePlaceholder, PLACEHOLDERS, type PlaceholderId } from './screens/PhasePlaceholder'
+import { EditorScreen } from './screens/EditorScreen'
+import { useVersionCounts } from './editor/useVersions'
+import type { EditSettings } from '../../shared/editor'
 
 const DEFAULT_FILTERS: LibraryFilters = { project: 'all', workflow: 'active' }
 
@@ -39,6 +42,17 @@ export function App() {
     )
   )
   const watch = useWatchFolders()
+  const versionCounts = useVersionCounts()
+  const [editor, setEditor] = useState<{ contentId: string | null; settings: EditSettings | null; key: number }>({
+    contentId: null,
+    settings: null,
+    key: 0
+  })
+
+  function openEditor(contentId: string, settings?: EditSettings) {
+    setEditor((current) => ({ contentId: contentId || null, settings: settings ?? null, key: current.key + 1 }))
+    setScreen('editor')
+  }
 
   const refreshProjects = useCallback(async () => {
     setProjects(await unwrap(api.projects.list()))
@@ -135,6 +149,8 @@ export function App() {
             library={library}
             projects={projectList}
             initialFilters={libraryFilters.filters}
+            versionCounts={versionCounts}
+            onOpenEditor={openEditor}
             onNotice={setNotice}
             onError={showError}
           />
@@ -152,6 +168,18 @@ export function App() {
               await library.reload()
               await watch.reload()
             }}
+            onNotice={setNotice}
+            onError={showError}
+          />
+        )}
+        {screen === 'editor' && (
+          <EditorScreen
+            key={editor.key}
+            content={library.assets?.find((a) => a.id === editor.contentId) ?? null}
+            initialSettings={editor.settings}
+            assets={library.assets}
+            projects={projectList}
+            onOpen={openEditor}
             onNotice={setNotice}
             onError={showError}
           />

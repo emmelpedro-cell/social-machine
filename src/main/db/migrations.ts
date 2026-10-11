@@ -246,6 +246,20 @@ export const MIGRATIONS: readonly Migration[] = [
       );
       CREATE INDEX idx_tasks_status ON tasks (status, run_after);
     `
+  },
+  {
+    version: 2,
+    name: 'version_rendering',
+    sql: `
+      -- Phase 2: rendering state and output details of edited versions.
+      ALTER TABLE content_versions ADD COLUMN error_message TEXT;
+      ALTER TABLE content_versions ADD COLUMN progress REAL NOT NULL DEFAULT 0;
+      ALTER TABLE content_versions ADD COLUMN encoder TEXT;
+      ALTER TABLE content_versions ADD COLUMN file_size INTEGER;
+      ALTER TABLE content_versions ADD COLUMN thumbnail_path TEXT;
+      CREATE INDEX idx_content_versions_status ON content_versions (status);
+      CREATE INDEX idx_edit_presets_project ON edit_presets (project_id);
+    `
   }
 ]
 

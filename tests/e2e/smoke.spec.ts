@@ -57,7 +57,7 @@ test('the renderer has no access to Node or ipcRenderer', async () => {
   expect(exposure).toEqual({
     require: 'undefined',
     process: 'undefined',
-    api: ['app', 'log', 'media', 'projects', 'settings', 'watch']
+    api: ['app', 'editor', 'log', 'media', 'presets', 'projects', 'settings', 'versions', 'watch']
   })
   await app.close()
 })
@@ -79,7 +79,6 @@ test('the media protocol only serves library contents', async () => {
 test('later-phase areas say what is coming instead of showing fake controls', async () => {
   const { app, page } = await launchApp(dataDir)
   for (const [label, heading] of [
-    ['Editor', 'Editor'],
     ['Contas', 'Contas'],
     ['Fila', 'Fila de publicação'],
     ['Analytics', 'Analytics'],
