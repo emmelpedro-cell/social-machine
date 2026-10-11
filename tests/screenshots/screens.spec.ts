@@ -215,6 +215,7 @@ test('screenshots', async () => {
   await shot(page, '09-calendario')
 
   // Library with details open.
+  await openLibrary(page)
   await page.getByTestId('filter-project').selectOption('all')
   await openCard(page, 'Golaço de bicicleta.mp4')
   await shot(page, '02-biblioteca')
