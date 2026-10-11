@@ -21,7 +21,12 @@ Acceptance criterion (spec §17): _the user follows the available interactions i
 
 ### Verification (Phase 6)
 
-_Pending CI run._
+**Verified on Windows** (GitHub Actions `windows-latest`, run 38154197646, 2026-10-11): install, type check, unit tests, Electron E2E, installer build and packaged-app test all passed.
+
+- **Unit tests: 209 passed, 1 skipped.** New: comments and replies collected from a stand-in following the commentThreads format and linked to the app's publication; first-sync backlog stored as read, no notification; later new comments notified; edits update in place; paging through 250 threads and stopping at known comments (one request on the next sync); read/resolve/reopen; a reply sent once even when requested twice at the same time, stored as own and not duplicated by the next sync; platform error messages; missing reply permission explained (no request sent); TikTok explained as unavailable; sync errors per account.
+- **Electron E2E: 17 passed.** New, through the real UI: capabilities per account (TikTok unavailable, YouTube comments and replies), sync, unread badge, filters by content and text, opening marks read, reply written and sent (exactly one request to the stand-in), replied/resolved filters, a comment on a video not published from the app (no reply, opens on YouTube), open the related content. The old placeholder test now checks no placeholder screens remain.
+- **Packaged app: 2 passed.**
+- Screenshot of the Inbox taken from the real app on CI (Screenshots run 38154546668).
 
 ### Known limitations (Phase 6)
 
