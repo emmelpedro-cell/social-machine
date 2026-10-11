@@ -145,7 +145,7 @@ test('compares real metrics by platform and per content, never inventing missing
 
   // Back to the overview: TikTok now leads by views per publication.
   await perf.getByTestId('performance-back').click()
-  await expect(page.getByTestId('tile-views')).toContainText('14.000')
+  await expect(page.getByTestId('tile-views')).toContainText('14 mil')
   const bars = page.locator('[data-testid="compare-bars"] [data-testid="bar-row"]')
   await expect(bars.first()).toHaveAttribute('data-key', 'TikTok')
   await expect(page.getByTestId('compare-table')).toContainText('YouTube')
@@ -164,6 +164,6 @@ test('compares real metrics by platform and per content, never inventing missing
   await page.getByTestId('performance-back').click()
   await page.getByTestId('analytics-refresh').click()
   await expect(page.getByTestId('metrics-problem')).toContainText('YouTube Analytics API não está ativada')
-  await expect(page.getByTestId('tile-views')).toContainText('14.200')
+  await expect(page.getByTestId('tile-views')).toContainText('14,2 mil')
   await app.close()
 })

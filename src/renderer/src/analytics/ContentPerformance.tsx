@@ -97,7 +97,7 @@ export function ContentPerformance({ contentId, projects, onBack, onNotice, onEr
                       const v = r.latest ? r.latest[key] : null
                       return (
                         <td key={r.publicationId} className={v === null ? 'is-unavailable' : ''} data-metric={key}>
-                          {fmtMetric(key, v)}
+                          {fmtMetric(key, v, true)}
                         </td>
                       )
                     })}
@@ -135,7 +135,7 @@ export function ContentPerformance({ contentId, projects, onBack, onNotice, onEr
                       const reached = Date.now() >= new Date(r.publishedAt).getTime() + m.hours * 3_600_000
                       return (
                         <td key={r.publicationId} className={v === null ? 'is-unavailable' : ''}>
-                          {v === null ? (reached ? UNAVAILABLE : 'ainda não') : fmtCount(v)}
+                          {v === null ? (reached ? UNAVAILABLE : 'ainda não') : fmtCount(v, true)}
                         </td>
                       )
                     })}

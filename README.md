@@ -103,6 +103,18 @@ Em **Fila**: o que precisa de você, o que está enviando, as agendadas por dia 
 
 Em **Calendário**: visão de mês, semana e dia, com filtro por projeto e conta. A cor da borda é o projeto. Arraste uma publicação para outro dia para reagendar (mantém o horário).
 
+### Analytics
+
+Em **Analytics**:
+
+- **YouTube:** as métricas são coletadas sozinhas (a cada poucas horas nos primeiros dias, depois com menos frequência) ou na hora, com **Atualizar métricas**. Visualizações, curtidas e comentários vêm da API de dados. Tempo assistido, compartilhamentos, inscritos ganhos e retenção vêm do **YouTube Analytics**, que costuma ter 1 a 3 dias de atraso.
+  - Ative a **YouTube Analytics API** no mesmo projeto do Google Cloud (APIs e serviços → Biblioteca). Sem ela, o app avisa e mostra só visualizações, curtidas e comentários.
+- **TikTok e Instagram:** abra o conteúdo (clique na tabela de conteúdos ou em **Ver desempenho** na Biblioteca) e copie os números do app da plataforma. Eles ficam marcados como "informado por você".
+- Filtros: período (7, 30, 90 dias ou tudo), projeto, plataforma e conta.
+- **Comparar por** plataforma, projeto, conta, formato ou duração, com gráfico e tabela.
+- A página de cada conteúdo compara todos os destinos lado a lado, com visualizações em 24 h, 7 e 30 dias e um gráfico da evolução.
+- Nada é estimado: o que falta aparece como "indisponível". Engajamento = (curtidas + comentários + compartilhamentos) ÷ visualizações.
+
 ### Pasta da Drop Machine
 
 Em **Configurações → Pastas monitoradas**, use **Adicionar pasta da Drop Machine…** e escolha a pasta de saída (normalmente `C:\drop-machine\public\output`). Escolha também o projeto que os vídeos novos devem receber.

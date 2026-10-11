@@ -346,13 +346,13 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
                   <tr key={key}>
                     <th scope="row">{groupLabel(key)}</th>
                     <td>{a.publications}</td>
-                    <td className={a.totals.views.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.views.sum)}</td>
-                    <td className={a.averageViews === null ? 'is-unavailable' : ''}>{fmtCount(a.averageViews)}</td>
-                    <td className={a.totals.likes.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.likes.sum)}</td>
-                    <td className={a.totals.comments.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.comments.sum)}</td>
-                    <td className={a.totals.shares.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.shares.sum)}</td>
+                    <td className={a.totals.views.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.views.sum, true)}</td>
+                    <td className={a.averageViews === null ? 'is-unavailable' : ''}>{fmtCount(a.averageViews, true)}</td>
+                    <td className={a.totals.likes.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.likes.sum, true)}</td>
+                    <td className={a.totals.comments.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.comments.sum, true)}</td>
+                    <td className={a.totals.shares.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.shares.sum, true)}</td>
                     <td className={a.engagement.rate === null ? 'is-unavailable' : ''}>{fmtPercent(a.engagement.rate)}</td>
-                    <td className={a.totals.followersGained.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.followersGained.sum)}</td>
+                    <td className={a.totals.followersGained.sum === null ? 'is-unavailable' : ''}>{fmtCount(a.totals.followersGained.sum, true)}</td>
                     <td className={a.totals.watchTimeSeconds.sum === null ? 'is-unavailable' : ''}>{fmtDuration(a.totals.watchTimeSeconds.sum)}</td>
                   </tr>
                 ))}
@@ -414,7 +414,7 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
                           </span>
                         ))}
                       </td>
-                      <td className={c.a.totals.views.sum === null ? 'is-unavailable' : ''}>{fmtCount(c.a.totals.views.sum)}</td>
+                      <td className={c.a.totals.views.sum === null ? 'is-unavailable' : ''}>{fmtCount(c.a.totals.views.sum, true)}</td>
                       <td className={c.a.engagement.rate === null ? 'is-unavailable' : ''}>{fmtPercent(c.a.engagement.rate)}</td>
                       <td className="muted">{formatRelative(c.latestPublished)}</td>
                     </tr>

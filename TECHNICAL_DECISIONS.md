@@ -119,6 +119,26 @@ TD-001 to TD-020 come from the Music Content Engine, whose Phase 1 code is the b
 **Decision:** dragging a post to another day in the month/week calendar reschedules it to the same time on that day, through the same `reschedule` path (validation: future time, not already on the platform). Pause stores status `draft` with `fields.paused`; resume needs a future time.
 **Why:** the common action is "move to another day"; the time is edited precisely with "Reagendar". One code path for every reschedule keeps the rules in one place.
 
+### TD-120 — YouTube metrics: Data API counters + YouTube Analytics API
+
+**Decision:** views, likes and comments come from `videos.list?part=statistics` (1 quota unit per 50 videos, fresh); watch time (`estimatedMinutesWatched`), average view duration and percentage, shares and subscribers gained come from the YouTube Analytics API `reports.query` (`ids=channel==MINE`, `dimensions=video`, `filters=video==…`, publish date → today); channel subscribers from `channels.list?part=statistics`. No new OAuth scope: per the Analytics reference (checked 2026-10-11), `youtube.readonly`, which the app already requests, is accepted. The Analytics API must be enabled in the user's Google Cloud project; when it isn't (403 `accessNotConfigured`), counters are still saved and the account shows how to enable it.
+**Why:** the Data API is cheap and current; Analytics has the richer metrics but lags a day or more, so a video missing from its rows keeps those fields `null`. Hidden counters (likes hidden by the owner, hidden subscriber count) are `null`, not zero.
+
+### TD-121 — Snapshots, never overwritten; cadence by age
+
+**Decision:** each collection inserts a row in `metric_snapshots` (source `api` or `manual`); the latest row is "current", the rest is history for charts and the 24 h / 7 d / 30 d marks (read as the last value at or before the mark). A 10-minute timer (first pass 30 s after start) collects publications whose last API snapshot is older than: 3 h (first 2 days), 12 h (to 30 days), 3 days (to 180 days), then 14 days. "Atualizar métricas" collects everything now. Collection status and the last error are stored per account (schema v4).
+**Why:** spec §11 asks for history, not only the last number; the cadence keeps API use tiny while catching the early curve.
+
+### TD-122 — Manual metrics for TikTok and Instagram, clearly labelled
+
+**Decision:** for manual accounts the content page has a form to type the numbers shown in the platform's app (views, likes, comments, shares, followers gained, with the reading time; "12,5 mil" accepted). They are stored as snapshots with source `manual`, shown as "informado por você", and only those can be deleted. Accounts with API metrics don't accept typed numbers.
+**Why:** without approved API access (TD-114) this is the only honest way to compare platforms; these are real numbers the user read, never estimates, and the source is always visible.
+
+### TD-123 — Aggregation rules: coverage instead of zeros
+
+**Decision:** totals sum only known values and report how many publications had each value ("1 de 2 com dado"); averages divide by publications with data. Engagement = (likes + comments + shares) ÷ views, only when all four exist and views > 0; group engagement is weighted (total interactions ÷ total views of those publications). Comparisons by platform, project, account, format (aspect ratio of the published version) and duration bucket are computed in the renderer from the same rows with one shared pure function, so every chart and table agrees. The UI notes that platforms count views differently.
+**Why:** spec §11: no invented numbers, a clearly defined engagement formula, and no comparison of incompatible definitions without explanation.
+
 ## Inherited decisions (Music Content Engine)
 
 ## TD-001 — electron-vite as the build tool

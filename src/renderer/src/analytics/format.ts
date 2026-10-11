@@ -26,8 +26,8 @@ export function fmtDuration(seconds: number | null): string {
   return h >= 100 ? `${full.format(h)} h` : `${h} h${m ? ` ${m} min` : ''}`
 }
 
-export function fmtMetric(key: MetricKey, value: number | null): string {
-  return key === 'watchTimeSeconds' || key === 'averageViewDurationSeconds' ? fmtDuration(value) : fmtCount(value)
+export function fmtMetric(key: MetricKey, value: number | null, exact = false): string {
+  return key === 'watchTimeSeconds' || key === 'averageViewDurationSeconds' ? fmtDuration(value) : fmtCount(value, exact)
 }
 
 /** Categorical slots for the dark surface (validated: adjacent CVD ΔE ≥ 8.4, contrast ≥ 3:1). Max 4 series. */

@@ -214,6 +214,36 @@ test('screenshots', async () => {
   await page.getByTestId('cal-item').first().click()
   await shot(page, '09-calendario')
 
+  // Analytics: YouTube numbers from the Google stand-in, TikTok numbers typed in.
+  const videoId = google.uploadedVideos[0]!.id
+  google.videoStats.set(videoId, { viewCount: '18420', likeCount: '1310', commentCount: '96' })
+  google.videoAnalytics.set(videoId, { minutes: 4210, avgDuration: 14, avgPercentage: 61.2, shares: 240, subscribers: 87 })
+  await page.evaluate(async () => {
+    const list = await window.sm.publications.list({})
+    if (!list.ok) return
+    const pending = list.data.find((p) => p.status === 'manual_pending')
+    if (!pending) return
+    await window.sm.publications.markPublished(pending.id, '')
+    await window.sm.analytics.addManual({
+      publicationId: pending.id,
+      capturedAt: new Date().toISOString(),
+      views: 42300,
+      likes: 3900,
+      comments: 210,
+      shares: 520,
+      followersGained: 160,
+      watchTimeSeconds: null,
+      averageViewDurationSeconds: null
+    })
+  })
+  await navigate(page, 'Analytics')
+  await page.getByTestId('analytics-refresh').click()
+  await expect(page.getByTestId('tile-views')).not.toContainText('indisponível')
+  await shot(page, '10-analytics')
+  await page.getByTestId('content-row').first().click()
+  await expect(page.getByTestId('performance-table')).toBeVisible()
+  await shot(page, '11-desempenho')
+
   // Library with details open.
   await openLibrary(page)
   await page.getByTestId('filter-project').selectOption('all')

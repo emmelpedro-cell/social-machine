@@ -1,8 +1,36 @@
 # Project status
 
-_Last updated: 2026-10-11 — Phase 4_
+_Last updated: 2026-10-11 — Phase 5_
 
-## Current phase: 4 — Queue and calendar
+## Current phase: 5 — Analytics
+
+Acceptance criterion (spec §17): _the user can compare the performance of publications on the connected networks._
+
+| Item | Status |
+| --- | --- |
+| API rules checked against official docs (Analytics `reports.query`, scopes, data lag) | Done (TD-120) |
+| Metrics per publication: YouTube counters (Data API) and watch time, average duration/percentage, shares, subscribers gained (Analytics API) | Done (TD-120) |
+| Metric history as snapshots, cadence by age, refresh on demand, per-account status and errors | Done (TD-121) |
+| TikTok/Instagram: numbers typed in from the platform's app, labelled "informado por você" | Done (TD-122) |
+| Analytics overview: totals with coverage, engagement with stated formula | Done (TD-123) |
+| Comparison by platform, project, account, format and duration (bars + table) | Done |
+| Content page: every destination side by side, 24 h / 7 d / 30 d marks, views over time | Done |
+| Followers per account (YouTube subscribers over time) | Done |
+| Unavailable data shown as unavailable, never zero | Done |
+| Schema v4 | Done |
+
+### Verification (Phase 5)
+
+_Pending CI run._
+
+### Known limitations (Phase 5)
+
+- YouTube Analytics data lags a day or more; the newest videos show those metrics as unavailable until it arrives.
+- TikTok and Instagram metrics are only what you type in (no approved API access).
+- Retention is the average percentage viewed; the full retention curve isn't collected yet.
+- Not verified against a real channel in CI (needs your Google project); the stand-in follows the documented request/response formats.
+
+## Phase 4 — Queue and calendar (accepted)
 
 Acceptance criterion (spec §17): _the user can schedule and manage publications across projects._
 
