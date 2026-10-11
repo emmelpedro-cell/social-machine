@@ -71,6 +71,7 @@ test('edits a clip into a 9:16 version with text and exports it', async () => {
   await page.getByTestId('frame-zoom').fill('1.2')
 
   // A text with a black box behind it.
+  await page.getByTestId('tab-texts').click()
   await page.getByTestId('add-text').click()
   await page.getByTestId('text-content').fill('KO NO 1º ROUND')
   await page.getByTestId('text-font').selectOption({ label: 'Anton' })
