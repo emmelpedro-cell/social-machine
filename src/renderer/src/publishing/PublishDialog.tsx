@@ -7,8 +7,11 @@ import {
   type Account,
   type DestinationInput,
   type PlatformId,
+  type ScheduleMode,
   type YouTubePrivacy
 } from '../../../shared/publishing'
+import { fromLocalInput, toLocalInput } from '../../../shared/schedule'
+import { formatDateTime } from '../format'
 import type { Project } from '../../../shared/schemas'
 import { api, ApiError, errorMessage, unwrap } from '../api'
 import type { NoticeState } from '../components/Notice'
@@ -57,6 +60,10 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [repeatWarning, setRepeatWarning] = useState<string | null>(null)
+  const [when, setWhen] = useState<'now' | 'schedule'>('now')
+  const [scheduleAt, setScheduleAt] = useState(() => toLocalInput(new Date(Date.now() + 3_600_000)))
+  const [ytMode, setYtMode] = useState<ScheduleMode>('platform')
+  const [suggesting, setSuggesting] = useState(false)
 
   useEffect(() => {
     unwrap(api.publications.notes(version.id)).then(setNotes, () => setNotes(null))
@@ -82,6 +89,25 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
   const chosen = ordered.filter((a) => selected.has(a.id))
   const hasYouTube = chosen.some((a) => a.platformId === 'youtube' && !a.manual)
   const tags = parseHashtags(hashtags)
+  const hasManual = chosen.some((a) => a.manual || a.platformId !== 'youtube')
+
+  /** The earliest posting slot free on every chosen account (from each account's preferred times). */
+  async function suggestSlot() {
+    if (chosen.length === 0) return setError('Escolha os destinos primeiro.')
+    setSuggesting(true)
+    setError(null)
+    try {
+      const lists = await Promise.all(chosen.map((a) => unwrap(api.queue.nextSlots(a.id, 20))))
+      const common = lists[0]!.find((slot) => lists.every((l) => l.includes(slot)))
+      const pick = common ?? lists.map((l) => l[0]).filter((x): x is string => Boolean(x)).sort().at(-1)
+      if (!pick) setError('Nenhum horário preferencial configurado nessas contas. Configure em Fila → Horários de postagem.')
+      else setScheduleAt(toLocalInput(new Date(pick)))
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setSuggesting(false)
+    }
+  }
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -102,6 +128,14 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
       setError('Informe se o vídeo é “feito para crianças” (o YouTube exige essa resposta).')
       return
     }
+    let scheduledAt: string | null = null
+    if (when === 'schedule') {
+      scheduledAt = fromLocalInput(scheduleAt)
+      if (!scheduledAt || new Date(scheduledAt).getTime() < Date.now() + 60_000) {
+        setError('Escolha um horário no futuro para agendar.')
+        return
+      }
+    }
     const destinations: DestinationInput[] = chosen.map((a) => ({
       accountId: a.id,
       title: title.trim() || null,
@@ -109,8 +143,15 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
       hashtags: tags,
       fields:
         a.platformId === 'youtube' && !a.manual
-          ? { privacy, madeForKids: madeForKids ?? undefined, categoryId, tags: tags.map((t) => t.replace(/^#/, '')) }
-          : {}
+          ? {
+              privacy,
+              madeForKids: madeForKids ?? undefined,
+              categoryId,
+              tags: tags.map((t) => t.replace(/^#/, '')),
+              ...(scheduledAt ? { scheduleMode: ytMode } : {})
+            }
+          : {},
+      scheduledAt
     }))
     setBusy(true)
     try {
@@ -119,7 +160,9 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
       const manual = created.filter((p) => p.status === 'manual_pending').length
       onNotice({
         tone: 'success',
-        text: [
+        text: scheduledAt
+          ? `${created.length} publicação(ões) agendada(s) para ${formatDateTime(scheduledAt)}. Acompanhe na Fila.`
+          : [
           queued ? `${queued} envio(s) na fila.` : '',
           manual ? `${manual} publicação(ões) manual(is): siga os passos na lista de publicações.` : ''
         ]
@@ -247,6 +290,45 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
           </fieldset>
         )}
 
+        <fieldset className="youtube-options when-options">
+          <legend>Quando</legend>
+          <div className="row wrap">
+            <label className="toggle">
+              <input type="radio" name="when" checked={when === 'now'} onChange={() => setWhen('now')} data-testid="when-now" />
+              <span>Agora</span>
+            </label>
+            <label className="toggle">
+              <input type="radio" name="when" checked={when === 'schedule'} onChange={() => setWhen('schedule')} data-testid="when-schedule" />
+              <span>Agendar</span>
+            </label>
+          </div>
+          {when === 'schedule' && (
+            <>
+              <div className="row wrap">
+                <input type="datetime-local" value={scheduleAt} onChange={(e) => setScheduleAt(e.target.value)} data-testid="schedule-at" />
+                <button type="button" className="btn btn-ghost btn-sm" onClick={suggestSlot} disabled={suggesting} data-testid="suggest-slot">
+                  {suggesting ? 'Procurando…' : 'Próximo horário livre'}
+                </button>
+              </div>
+              {hasYouTube && (
+                <label className="inline-field">
+                  <span>No YouTube</span>
+                  <select value={ytMode} onChange={(e) => setYtMode(e.target.value as ScheduleMode)} data-testid="schedule-mode">
+                    <option value="platform">Agendar no próprio YouTube (envia agora como privado)</option>
+                    <option value="local">Enviar no horário (o computador precisa estar ligado)</option>
+                  </select>
+                </label>
+              )}
+              <p className="small muted">
+                {hasYouTube && ytMode === 'platform' && 'O YouTube publica sozinho no horário, mesmo com o computador desligado. '}
+                {(hasManual || (hasYouTube && ytMode === 'local')) &&
+                  'No horário, o app precisa estar aberto (pode ficar na bandeja). Se o computador estiver desligado, nada é publicado atrasado sem você: a publicação fica marcada para você decidir. '}
+                {hasManual && 'Para TikTok e Instagram você recebe um aviso no horário para publicar.'}
+              </p>
+            </>
+          )}
+        </fieldset>
+
         {repeatWarning && (
           <div className="confirm" role="alertdialog">
             <p>{repeatWarning}</p>
@@ -274,7 +356,15 @@ export function PublishDialog({ version, content, project, onClose, onOpenAccoun
             Cancelar
           </button>
           <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={busy || chosen.length === 0} data-testid="publish-submit">
-            {busy ? 'Enviando…' : chosen.length > 1 ? `Publicar em ${chosen.length} destinos` : 'Publicar'}
+            {busy
+              ? 'Enviando…'
+              : when === 'schedule'
+                ? chosen.length > 1
+                  ? `Agendar em ${chosen.length} destinos`
+                  : 'Agendar'
+                : chosen.length > 1
+                  ? `Publicar em ${chosen.length} destinos`
+                  : 'Publicar'}
           </button>
         </div>
       </div>

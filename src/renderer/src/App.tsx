@@ -15,6 +15,9 @@ import { SettingsScreen } from './screens/SettingsScreen'
 import { PhasePlaceholder, PLACEHOLDERS, type PlaceholderId } from './screens/PhasePlaceholder'
 import { EditorScreen } from './screens/EditorScreen'
 import { AccountsScreen } from './screens/AccountsScreen'
+import { QueueScreen } from './screens/QueueScreen'
+import { CalendarScreen } from './screens/CalendarScreen'
+import { useAttentionCount } from './queue/useAttention'
 import { useVersionCounts } from './editor/useVersions'
 import type { EditSettings } from '../../shared/editor'
 
@@ -44,6 +47,7 @@ export function App() {
   )
   const watch = useWatchFolders()
   const versionCounts = useVersionCounts()
+  const attention = useAttentionCount()
   const [editor, setEditor] = useState<{ contentId: string | null; settings: EditSettings | null; key: number }>({
     contentId: null,
     settings: null,
@@ -131,6 +135,7 @@ export function App() {
         onNavigate={(id) => (id === 'library' ? openLibrary(DEFAULT_FILTERS) : setScreen(id))}
         version={info?.version}
         needsReview={needsReview}
+        attention={attention}
       />
       <main className="main" aria-live="polite">
         {screen === 'dashboard' && (
@@ -142,6 +147,7 @@ export function App() {
             onOpenLibrary={openLibrary}
             onOpenProjects={() => setScreen('projects')}
             onOpenSettings={() => setScreen('settings')}
+            onOpenQueue={() => setScreen('queue')}
             onNotice={setNotice}
             onError={showError}
           />
@@ -188,6 +194,12 @@ export function App() {
             onNotice={setNotice}
             onError={showError}
           />
+        )}
+        {screen === 'queue' && (
+          <QueueScreen projects={projectList} onOpenCalendar={() => setScreen('calendar')} onNotice={setNotice} onError={showError} />
+        )}
+        {screen === 'calendar' && (
+          <CalendarScreen projects={projectList} onOpenQueue={() => setScreen('queue')} onNotice={setNotice} onError={showError} />
         )}
         {screen === 'accounts' && <AccountsScreen projects={projectList} onNotice={setNotice} onError={showError} />}
         {(Object.keys(PLACEHOLDERS) as PlaceholderId[]).includes(screen as PlaceholderId) && (

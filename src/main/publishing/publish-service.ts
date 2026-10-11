@@ -26,6 +26,13 @@ export type PublishServiceOptions = {
   emit: (event: PublicationEvent) => void
   /** Uploads in parallel across accounts; one at a time per account. */
   concurrency?: number
+  /** How late (minutes) a local schedule may still run; later ones wait for the user. */
+  graceMinutes?: () => number
+  /** Desktop notification (manual posts due, missed schedules). */
+  notify?: (title: string, body: string) => void
+  now?: () => number
+  /** Scheduler tick interval; 0 disables the timer (tests call tick()). */
+  tickMs?: number
 }
 
 /**
@@ -41,8 +48,12 @@ export class PublishService {
   private readonly cancelled = new Set<string>()
   private shuttingDown = false
   private idleWaiters: (() => void)[] = []
+  private timer: NodeJS.Timeout | null = null
+  private readonly now: () => number
 
-  constructor(private readonly options: PublishServiceOptions) {}
+  constructor(private readonly options: PublishServiceOptions) {
+    this.now = options.now ?? Date.now
+  }
 
   platforms(): PlatformInfo[] {
     return (Object.keys(this.options.connectors) as PlatformId[]).map((id) => this.options.connectors[id].info())
@@ -57,9 +68,18 @@ export class PublishService {
       this.enqueue(id)
     }
     if (ids.length) this.options.logger.info('Resuming publications', { count: ids.length })
+    // Schedules that came due while the app was closed are handled now (late ones wait for the user).
+    this.tick()
+    const interval = this.options.tickMs ?? 20_000
+    if (interval > 0) {
+      this.timer = setInterval(() => this.tick(), interval)
+      this.timer.unref?.()
+    }
   }
 
   shutdown(): void {
+    if (this.timer) clearInterval(this.timer)
+    this.timer = null
     this.shuttingDown = true
     this.queue.length = 0
     for (const job of this.active.values()) job.controller.abort()
@@ -108,7 +128,20 @@ export class PublishService {
         created.push(plan.existing)
         continue
       }
+      const requested = plan.destination.scheduledAt ? new Date(plan.destination.scheduledAt).getTime() : null
+      // A time in the past or within the next 30 seconds means "now".
+      const scheduledAt = requested && requested > this.now() + 30_000 ? new Date(requested).toISOString() : null
+      const connector = this.options.connectors[plan.account.platformId]
       const fields: PublicationFields = { ...plan.destination.fields }
+      let status: Publication['status'] = plan.manual ? 'manual_pending' : 'queued'
+      if (scheduledAt) {
+        const mode = plan.manual ? 'local' : (fields.scheduleMode ?? (connector.supportsPlatformScheduling ? 'platform' : 'local'))
+        fields.scheduleMode = mode === 'platform' && connector.supportsPlatformScheduling ? 'platform' : 'local'
+        // Platform scheduling uploads right away; local scheduling waits for the time.
+        status = fields.scheduleMode === 'platform' ? 'queued' : 'scheduled'
+      } else {
+        delete fields.scheduleMode
+      }
       const publication = this.options.publications.create({
         contentId: versionRecord.contentId,
         versionId: versionRecord.id,
@@ -117,12 +150,13 @@ export class PublishService {
         caption: plan.destination.caption,
         hashtags: plan.destination.hashtags.map((h) => (h.startsWith('#') ? h : `#${h}`)),
         fields,
-        status: plan.manual ? 'manual_pending' : 'queued',
-        idempotencyKey: plan.key
+        status,
+        idempotencyKey: plan.key,
+        scheduledAt
       })
       created.push(publication)
       this.emit({ type: 'publication', publication })
-      if (!plan.manual) this.enqueue(publication.id)
+      if (status === 'queued') this.enqueue(publication.id)
     }
     this.options.logger.info('Publications created', { version: versionRecord.id, count: created.length })
     return { created }
@@ -150,7 +184,10 @@ export class PublishService {
       job.controller.abort()
       return publication
     }
-    if (!['queued', 'manual_pending', 'failed'].includes(publication.status)) {
+    if (this.onPlatform(publication)) {
+      throw new ConflictError('Esse vídeo já está no YouTube, agendado como privado. Cancele ou apague no YouTube Studio.')
+    }
+    if (!['queued', 'manual_pending', 'failed', 'scheduled', 'draft'].includes(publication.status)) {
       throw new ConflictError('Essa publicação não pode mais ser cancelada.')
     }
     const index = this.queue.indexOf(id)
@@ -165,6 +202,115 @@ export class PublishService {
     const publication = this.options.publications.get(id)
     if (publication.status !== 'manual_pending') throw new ConflictError('Essa publicação não está aguardando confirmação.')
     const updated = this.options.publications.markPublished(id, { externalPostId: null, externalUrl: url })
+    this.emit({ type: 'publication', publication: updated })
+    return updated
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Scheduling                                                       */
+  /* ---------------------------------------------------------------- */
+
+  /** True when the platform already holds the post for its scheduled time (can't be changed from here). */
+  private onPlatform(p: Publication): boolean {
+    return p.status === 'scheduled' && p.fields.scheduleMode === 'platform' && p.externalPostId !== null
+  }
+
+  /**
+   * Runs due schedules. A local schedule runs if it is at most `graceMinutes` late;
+   * later than that (the computer was off) it is flagged as missed and waits for the user,
+   * so nothing is ever published silently at an unexpected time.
+   */
+  tick(): void {
+    const now = this.now()
+    const grace = (this.options.graceMinutes?.() ?? 15) * 60_000
+    for (const p of this.options.publications.due(new Date(now).toISOString())) {
+      if (this.onPlatform(p)) {
+        const live = this.options.publications.markLiveAt(p.id, p.scheduledAt!)
+        this.emit({ type: 'publication', publication: live })
+        continue
+      }
+      if (p.fields.missed) continue
+      const account = this.options.accounts.find(p.accountId)
+      if (!account) continue
+      const late = now - new Date(p.scheduledAt!).getTime()
+      if (late > grace) {
+        const flagged = this.options.publications.updateFields(p.id, { missed: true })
+        this.emit({ type: 'publication', publication: flagged })
+        this.options.notify?.('Horário perdido', `${account.displayName}: a publicação de ${formatTime(p.scheduledAt!)} não foi feita porque o app estava fechado. Abra a Fila para publicar ou reagendar.`)
+        continue
+      }
+      const manual = account.manual || !this.options.connectors[account.platformId].publish
+      const to = manual ? 'manual_pending' : 'queued'
+      if (!this.options.publications.transition(p.id, 'scheduled', to)) continue
+      const updated = this.options.publications.get(p.id)
+      this.emit({ type: 'publication', publication: updated })
+      if (manual) this.options.notify?.('Hora de publicar', `${account.displayName}: “${p.title ?? 'publicação'}” está pronta para você publicar.`)
+      else this.enqueue(p.id)
+    }
+  }
+
+  reschedule(id: string, scheduledAtInput: string): Publication {
+    const p = this.options.publications.get(id)
+    const at = new Date(scheduledAtInput)
+    if (at.getTime() <= this.now() + 30_000) throw new UnprocessableError('Escolha um horário no futuro.')
+    if (this.onPlatform(p)) throw new ConflictError('Esse vídeo já está agendado no YouTube. Mude o horário no YouTube Studio.')
+    if (!['scheduled', 'draft', 'manual_pending', 'failed', 'cancelled'].includes(p.status)) {
+      throw new ConflictError('Essa publicação não pode mais ser reagendada.')
+    }
+    const repo = this.options.publications
+    repo.setSchedule(id, at.toISOString())
+    const account = this.options.accounts.record(p.accountId)
+    const connector = this.options.connectors[account.platformId]
+    const manual = account.manual || !connector.publish
+    const mode = manual ? 'local' : (p.fields.scheduleMode ?? (connector.supportsPlatformScheduling ? 'platform' : 'local'))
+    repo.updateFields(id, { missed: undefined, scheduleMode: mode })
+    let updated: Publication
+    if (p.status === 'draft') {
+      updated = repo.get(id) // stays paused, with the new time
+    } else if (mode === 'platform') {
+      updated = repo.setStatus(id, 'queued')
+      this.enqueue(id)
+    } else {
+      updated = repo.setStatus(id, 'scheduled')
+    }
+    this.emit({ type: 'publication', publication: updated })
+    return updated
+  }
+
+  publishNow(id: string): Publication {
+    const p = this.options.publications.get(id)
+    if (!['scheduled', 'draft'].includes(p.status) || this.onPlatform(p)) {
+      throw new ConflictError('Só é possível publicar agora uma publicação agendada ou pausada que ainda não foi enviada.')
+    }
+    const repo = this.options.publications
+    const account = this.options.accounts.record(p.accountId)
+    const manual = account.manual || !this.options.connectors[account.platformId].publish
+    if (!manual && account.connectionStatus !== 'connected') throw new ConflictError(`A conta ${account.displayName} não está conectada. Reconecte-a em Contas.`)
+    repo.setSchedule(id, null)
+    repo.updateFields(id, { missed: undefined, paused: undefined, scheduleMode: undefined })
+    const updated = repo.setStatus(id, manual ? 'manual_pending' : 'queued')
+    this.emit({ type: 'publication', publication: updated })
+    if (!manual) this.enqueue(id)
+    return updated
+  }
+
+  pause(id: string): Publication {
+    const p = this.options.publications.get(id)
+    if (p.status !== 'scheduled' || this.onPlatform(p)) throw new ConflictError('Só é possível pausar uma publicação agendada que ainda não foi enviada.')
+    if (!this.options.publications.transition(id, 'scheduled', 'draft')) throw new ConflictError('A publicação mudou de estado. Atualize e tente de novo.')
+    const updated = this.options.publications.updateFields(id, { paused: true })
+    this.emit({ type: 'publication', publication: updated })
+    return updated
+  }
+
+  resume(id: string): Publication {
+    const p = this.options.publications.get(id)
+    if (p.status !== 'draft') throw new ConflictError('Essa publicação não está pausada.')
+    if (!p.scheduledAt || new Date(p.scheduledAt).getTime() <= this.now() + 30_000) {
+      throw new UnprocessableError('O horário dessa publicação já passou. Escolha um novo horário ou publique agora.')
+    }
+    this.options.publications.transition(id, 'draft', 'scheduled')
+    const updated = this.options.publications.updateFields(id, { paused: undefined })
     this.emit({ type: 'publication', publication: updated })
     return updated
   }
@@ -235,8 +381,12 @@ export class PublishService {
           this.emit({ type: 'publication', publication })
         }
       })
-      publication = repo.markPublished(id, result)
-      this.options.logger.info('Published', { id, account: account.id, post: result.externalPostId })
+      publication = result.scheduledOnPlatform ? repo.markUploadedScheduled(id, result) : repo.markPublished(id, result)
+      this.options.logger.info(result.scheduledOnPlatform ? 'Uploaded, scheduled on platform' : 'Published', {
+        id,
+        account: account.id,
+        post: result.externalPostId
+      })
       this.emit({ type: 'publication', publication })
     } catch (error) {
       if (this.shuttingDown) return // stays "publishing"; resumed on next start
@@ -286,4 +436,8 @@ export class PublishService {
       this.options.logger.warn('Publication event delivery failed', { error })
     }
   }
+}
+
+function formatTime(iso: string): string {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso))
 }

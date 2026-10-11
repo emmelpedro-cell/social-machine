@@ -134,6 +134,11 @@ const api: SmApi = {
     markPublished: (id, url) => call(IpcChannels.publicationsMarkPublished, { id, url }),
     openUrl: (id) => call(IpcChannels.publicationsOpenUrl, { id }),
     notes: (versionId) => call(IpcChannels.publicationsNotes, { id: versionId }),
+    queue: (from, to) => call(IpcChannels.publicationsQueue, { from, to }),
+    reschedule: (id, scheduledAt) => call(IpcChannels.publicationsReschedule, { id, scheduledAt }),
+    publishNow: (id) => call(IpcChannels.publicationsPublishNow, { id }),
+    pause: (id) => call(IpcChannels.publicationsPause, { id }),
+    resume: (id) => call(IpcChannels.publicationsResume, { id }),
     onEvent: (listener) => {
       const handler = (_event: Electron.IpcRendererEvent, payload: PublicationEvent) => listener(payload)
       ipcRenderer.on(IpcEvents.publishing, handler)
@@ -141,6 +146,12 @@ const api: SmApi = {
         ipcRenderer.removeListener(IpcEvents.publishing, handler)
       }
     }
+  },
+  queue: {
+    settings: () => call(IpcChannels.queueSettingsList),
+    saveSettings: (settings) => call(IpcChannels.queueSettingsSave, settings),
+    nextSlots: (accountId, count, after) =>
+      call(IpcChannels.queueNextSlots, after ? { accountId, count: count ?? 1, after } : { accountId, count: count ?? 1 })
   },
   settings: {
     get: () => call(IpcChannels.settingsGet),

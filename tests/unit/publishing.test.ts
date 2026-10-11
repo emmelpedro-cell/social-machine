@@ -377,6 +377,182 @@ describe('publishing', () => {
     expect(() => new FileSecretStore(dir, { ...cipher, isAvailable: () => false }).save({})).toThrow(/criptografia/)
   })
 
+  describe('scheduling', () => {
+    let clock: number
+    let notices: { title: string; body: string }[]
+    const MIN = 60_000
+    const scheduler = () =>
+      new PublishService({
+        publications,
+        accounts,
+        versions,
+        connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
+        logger: memoryLogger(),
+        emit: (e) => events.push(e),
+        notify: (title, body) => notices.push({ title, body }),
+        now: () => clock,
+        tickMs: 0
+      })
+    const manualAt = (accountId: string, at: number) =>
+      service.create({
+        versionId,
+        destinations: [{ accountId, title: 'Golaço', caption: 'ok', hashtags: [], fields: {}, scheduledAt: new Date(at).toISOString() }],
+        allowRepeat: true,
+        requestId: randomUUID()
+      }).created[0]!
+
+    beforeEach(() => {
+      clock = Date.now()
+      notices = []
+      service.shutdown()
+      service = scheduler()
+    })
+
+    it('runs a local schedule at its time and reminds you about manual destinations', () => {
+      const tiktok = accounts.addManual({ platformId: 'tiktok', displayName: '@cortes', projectIds: [] })
+      const p = manualAt(tiktok.id, clock + 60 * MIN)
+      expect(p).toMatchObject({ status: 'scheduled', fields: { scheduleMode: 'local' } })
+      expect(p.scheduledAt).toBe(new Date(clock + 60 * MIN).toISOString())
+
+      clock += 30 * MIN
+      service.tick()
+      expect(publications.get(p.id).status).toBe('scheduled')
+
+      clock += 31 * MIN
+      service.tick()
+      expect(publications.get(p.id).status).toBe('manual_pending')
+      expect(notices).toEqual([expect.objectContaining({ title: 'Hora de publicar' })])
+      service.tick()
+      expect(notices).toHaveLength(1)
+    })
+
+    it('uploads a locally scheduled YouTube video when its time comes', async () => {
+      const yt = await connect()
+      const { created } = service.create({
+        versionId,
+        destinations: [ytDestination(yt.id, { scheduledAt: new Date(clock + 10 * MIN).toISOString(), fields: { privacy: 'unlisted', madeForKids: false, categoryId: '17', scheduleMode: 'local' } })],
+        allowRepeat: false,
+        requestId: randomUUID()
+      })
+      expect(created[0]!.status).toBe('scheduled')
+      await service.waitForIdle()
+      expect(google.uploadedVideos).toHaveLength(0)
+
+      clock += 10 * MIN + 5_000
+      service.tick()
+      await service.waitForIdle()
+      expect(publications.get(created[0]!.id).status).toBe('published')
+      expect((google.uploadedVideos[0]!.metadata as { status: Record<string, unknown> }).status).toEqual({
+        privacyStatus: 'unlisted',
+        selfDeclaredMadeForKids: false,
+        embeddable: true
+      })
+    })
+
+    it('never publishes late silently: a schedule missed beyond the grace window waits for you', async () => {
+      const yt = await connect()
+      const { created } = service.create({
+        versionId,
+        destinations: [ytDestination(yt.id, { scheduledAt: new Date(clock + 60 * MIN).toISOString(), fields: { privacy: 'unlisted', madeForKids: false, categoryId: '17', scheduleMode: 'local' } })],
+        allowRepeat: false,
+        requestId: randomUUID()
+      })
+      const id = created[0]!.id
+      // The computer was off: the app comes back 20 minutes after the time (grace is 15).
+      clock += 80 * MIN
+      service.shutdown()
+      service = scheduler()
+      service.start()
+      await service.waitForIdle()
+      expect(publications.get(id)).toMatchObject({ status: 'scheduled', fields: { missed: true } })
+      expect(google.uploadedVideos).toHaveLength(0)
+      expect(notices).toEqual([expect.objectContaining({ title: 'Horário perdido' })])
+      service.tick()
+      expect(notices).toHaveLength(1)
+      // Listed as waiting for you whatever range the queue asks for.
+      const farAway = { from: new Date(clock + 30 * 24 * 60 * MIN).toISOString(), to: new Date(clock + 31 * 24 * 60 * MIN).toISOString() }
+      expect(publications.listQueue(farAway).map((i) => i.id)).toEqual([id])
+
+      const now = service.publishNow(id)
+      expect(now).toMatchObject({ status: 'queued', scheduledAt: null })
+      expect(now.fields.missed).toBeUndefined()
+      await service.waitForIdle()
+      expect(publications.get(id).status).toBe('published')
+    })
+
+    it('runs a schedule that is only a little late (within the grace window)', () => {
+      const tiktok = accounts.addManual({ platformId: 'tiktok', displayName: '@cortes', projectIds: [] })
+      const p = manualAt(tiktok.id, clock + 60 * MIN)
+      clock += 70 * MIN
+      service.tick()
+      expect(publications.get(p.id).status).toBe('manual_pending')
+    })
+
+    it('schedules on YouTube itself (publishAt): uploads now as private and is live at the time', async () => {
+      const yt = await connect()
+      const at = new Date(Date.now() + 120 * MIN).toISOString()
+      const { created } = service.create({ versionId, destinations: [ytDestination(yt.id, { scheduledAt: at })], allowRepeat: false, requestId: randomUUID() })
+      const id = created[0]!.id
+      expect(created[0]).toMatchObject({ status: 'queued', fields: { scheduleMode: 'platform' } })
+      await service.waitForIdle()
+
+      const uploaded = publications.get(id)
+      expect(uploaded).toMatchObject({ status: 'scheduled', externalPostId: 'vid-s1', publishedAt: null })
+      expect((google.uploadedVideos[0]!.metadata as { status: Record<string, unknown> }).status).toEqual({
+        privacyStatus: 'private',
+        selfDeclaredMadeForKids: false,
+        embeddable: true,
+        publishAt: at
+      })
+      // Already on YouTube: changes happen in YouTube Studio.
+      expect(() => service.reschedule(id, new Date(Date.now() + 200 * MIN).toISOString())).toThrow(/YouTube Studio/)
+      expect(() => service.pause(id)).toThrow()
+      expect(() => service.cancel(id)).toThrow(/YouTube Studio/)
+
+      clock = new Date(at).getTime() + 1_000
+      service.tick()
+      expect(publications.get(id)).toMatchObject({ status: 'published', publishedAt: at })
+      expect(google.uploadedVideos).toHaveLength(1)
+    })
+
+    it('pauses, reschedules and resumes', () => {
+      const tiktok = accounts.addManual({ platformId: 'tiktok', displayName: '@cortes', projectIds: [] })
+      const p = manualAt(tiktok.id, clock + 60 * MIN)
+      expect(service.pause(p.id)).toMatchObject({ status: 'draft', fields: { paused: true } })
+
+      clock += 61 * MIN
+      service.tick()
+      expect(publications.get(p.id).status).toBe('draft')
+      expect(() => service.resume(p.id)).toThrow(/já passou/)
+
+      const later = new Date(clock + 120 * MIN).toISOString()
+      expect(service.reschedule(p.id, later)).toMatchObject({ status: 'draft', scheduledAt: later })
+      expect(service.resume(p.id)).toMatchObject({ status: 'scheduled', scheduledAt: later })
+      expect(publications.get(p.id).fields.paused).toBeUndefined()
+      expect(() => service.reschedule(p.id, new Date(clock - MIN).toISOString())).toThrow(/futuro/)
+
+      expect(service.cancel(p.id).status).toBe('cancelled')
+    })
+
+    it('treats a time in the past as "now", and lists the queue', () => {
+      const tiktok = accounts.addManual({ platformId: 'tiktok', displayName: '@cortes', projectIds: [] })
+      const p = manualAt(tiktok.id, clock - 5 * MIN)
+      expect(p).toMatchObject({ status: 'manual_pending', scheduledAt: null })
+      const q = manualAt(tiktok.id, clock + 24 * 60 * MIN)
+      const queue = publications.listQueue({ from: new Date(clock).toISOString(), to: new Date(clock + 7 * 24 * 60 * MIN).toISOString() })
+      expect(queue.map((i) => i.id)).toEqual(expect.arrayContaining([p.id, q.id]))
+      expect(queue.find((i) => i.id === q.id)).toMatchObject({ accountName: '@cortes', projectId: null })
+      expect(publications.plannedTimes(tiktok.id, new Date(clock).toISOString())).toEqual([q.scheduledAt])
+    })
+
+    it('moves a publication between states atomically, so it is never run twice', () => {
+      const tiktok = accounts.addManual({ platformId: 'tiktok', displayName: '@cortes', projectIds: [] })
+      const p = manualAt(tiktok.id, clock + 60 * MIN)
+      expect(publications.transition(p.id, 'scheduled', 'queued')).toBe(true)
+      expect(publications.transition(p.id, 'scheduled', 'queued')).toBe(false)
+    })
+  })
+
   it('rejects bad credentials clearly', async () => {
     expect(new OAuthError('x', true).reauthorize).toBe(true)
     const config = new YouTubeClientConfig(db, secrets)

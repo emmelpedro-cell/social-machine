@@ -32,26 +32,9 @@ export function PhasePlaceholder({ title, phase, summary, planned }: Placeholder
   )
 }
 
-export type PlaceholderId = 'queue' | 'calendar' | 'inbox' | 'analytics'
+export type PlaceholderId = 'inbox' | 'analytics'
 
 export const PLACEHOLDERS: Record<PlaceholderId, PlaceholderProps> = {
-  queue: {
-    title: 'Fila de publicação',
-    phase: 4,
-    summary: 'Publicações preparadas, por conta e por destino, com agendamento local.',
-    planned: [
-      'Uma tarefa independente por destino: uma falha não bloqueia as outras',
-      'Dias e horários preferenciais por conta',
-      'Reagendar, pausar e cancelar',
-      'Proteção contra publicar a mesma tarefa duas vezes'
-    ]
-  },
-  calendar: {
-    title: 'Calendário',
-    phase: 4,
-    summary: 'Visão diária, semanal e mensal de tudo o que está agendado ou publicado.',
-    planned: ['Conteúdo, projeto, conta, plataforma, horário e status de cada publicação', 'Edição de horário por destino']
-  },
   analytics: {
     title: 'Analytics',
     phase: 5,

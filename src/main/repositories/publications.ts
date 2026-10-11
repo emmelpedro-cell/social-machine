@@ -106,7 +106,7 @@ export class PublicationsRepository {
         .prepare(
           `SELECT ${COLUMNS} FROM publications p
            WHERE p.content_version_id = ? AND p.account_id = ?
-             AND p.status IN ('queued', 'scheduled', 'publishing', 'published', 'manual_pending')`
+             AND p.status IN ('queued', 'scheduled', 'publishing', 'published', 'manual_pending', 'draft')`
         )
         .all(versionId, accountId) as Row[]
     ).map(toPublication)
@@ -122,14 +122,15 @@ export class PublicationsRepository {
     fields: PublicationFields
     status: PublicationStatus
     idempotencyKey: string
+    scheduledAt?: string | null
   }): Publication {
     const id = this.newId()
     const t = this.now()
     this.db
       .prepare(
         `INSERT INTO publications (id, content_id, content_version_id, account_id, title, caption, hashtags_json, fields_json,
-           status, idempotency_key, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           status, idempotency_key, scheduled_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -142,6 +143,7 @@ export class PublicationsRepository {
         JSON.stringify(input.fields),
         input.status,
         input.idempotencyKey,
+        input.scheduledAt ?? null,
         t,
         t
       )
@@ -171,6 +173,95 @@ export class PublicationsRepository {
       contentName: r.content_title ?? r.content_file_name,
       versionName: r.version_name
     }))
+  }
+
+  /**
+   * Publications planned or active in a time range (by scheduled time, or by creation time when unscheduled),
+   * plus everything waiting for the user (manual pending, missed, failed, paused) regardless of date.
+   */
+  listQueue(range: { from: string; to: string }): (PublicationSummary & { projectId: string | null })[] {
+    const rows = this.db
+      .prepare(
+        `SELECT ${COLUMNS}, a.display_name AS account_name, a.platform_id AS platform_id,
+           c.title AS content_title, c.file_name AS content_file_name, c.project_id AS project_id, v.version_name AS version_name
+         FROM publications p
+         JOIN accounts a ON a.id = p.account_id
+         JOIN contents c ON c.id = p.content_id
+         LEFT JOIN content_versions v ON v.id = p.content_version_id
+         WHERE (p.status IN ('scheduled', 'queued', 'publishing', 'published') AND COALESCE(p.scheduled_at, p.published_at, p.created_at) BETWEEN ? AND ?)
+            OR p.status IN ('manual_pending', 'failed', 'draft')
+            OR (p.status = 'scheduled' AND json_extract(p.fields_json, '$.missed') = 1)
+         ORDER BY COALESCE(p.scheduled_at, p.published_at, p.created_at)`
+      )
+      .all(range.from, range.to) as (SummaryRow & { project_id: string | null })[]
+    return rows.map((r) => ({
+      ...toPublication(r),
+      accountName: r.account_name,
+      platformId: r.platform_id,
+      contentName: r.content_title ?? r.content_file_name,
+      versionName: r.version_name,
+      projectId: r.project_id
+    }))
+  }
+
+  /** Planned times of an account's publications (for free-slot search). */
+  plannedTimes(accountId: string, from: string): string[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT scheduled_at FROM publications WHERE account_id = ? AND scheduled_at IS NOT NULL AND scheduled_at >= ?
+             AND status IN ('scheduled', 'queued', 'publishing', 'draft', 'published')`
+        )
+        .all(accountId, from) as { scheduled_at: string }[]
+    ).map((r) => r.scheduled_at)
+  }
+
+  /** Scheduled publications whose time has come. */
+  due(now: string): Publication[] {
+    return (
+      this.db
+        .prepare(`SELECT ${COLUMNS} FROM publications p WHERE p.status = 'scheduled' AND p.scheduled_at IS NOT NULL AND p.scheduled_at <= ? ORDER BY p.scheduled_at`)
+        .all(now) as Row[]
+    ).map(toPublication)
+  }
+
+  setSchedule(id: string, scheduledAt: string | null): Publication {
+    this.db.prepare('UPDATE publications SET scheduled_at = ?, updated_at = ? WHERE id = ?').run(scheduledAt, this.now(), id)
+    return this.get(id)
+  }
+
+  /**
+   * Moves a publication from one status to another only if it is still in the expected one.
+   * Returns false when someone else got there first (prevents double publishing).
+   */
+  transition(id: string, from: PublicationStatus, to: PublicationStatus): boolean {
+    const result = this.db
+      .prepare('UPDATE publications SET status = ?, error_message = NULL, updated_at = ? WHERE id = ? AND status = ?')
+      .run(to, this.now(), id, from)
+    return Number(result.changes) === 1
+  }
+
+  /** The platform accepted the upload and will publish at the scheduled time (YouTube publishAt). */
+  markUploadedScheduled(id: string, result: { externalPostId: string | null; externalUrl: string | null }): Publication {
+    return transaction(this.db, () => {
+      const current = this.get(id)
+      const { upload: _u, progress: _p, ...fields } = current.fields
+      this.db
+        .prepare(
+          `UPDATE publications SET status = 'scheduled', error_message = NULL, external_post_id = ?, external_url = ?,
+             fields_json = ?, updated_at = ? WHERE id = ?`
+        )
+        .run(result.externalPostId, result.externalUrl, JSON.stringify(fields), this.now(), id)
+      return this.get(id)
+    })
+  }
+
+  /** A platform-scheduled publication reached its time: it is live on the platform. */
+  markLiveAt(id: string, at: string): Publication {
+    this.db
+      .prepare(`UPDATE publications SET status = 'published', published_at = ?, updated_at = ? WHERE id = ? AND status = 'scheduled'`)
+      .run(at, this.now(), id)
+    return this.get(id)
   }
 
   idsWithStatus(statuses: PublicationStatus[]): string[] {

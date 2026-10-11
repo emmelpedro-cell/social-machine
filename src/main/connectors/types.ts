@@ -19,7 +19,12 @@ export type PublishContext = {
   signal: AbortSignal
 }
 
-export type PublishResult = { externalPostId: string | null; externalUrl: string | null }
+export type PublishResult = {
+  externalPostId: string | null
+  externalUrl: string | null
+  /** The platform holds the post and publishes it at the scheduled time. */
+  scheduledOnPlatform?: boolean
+}
 
 /**
  * One module per platform. Capabilities differ: the UI asks `info()` before
@@ -35,6 +40,8 @@ export interface Connector {
   connect?(projectIds: string[]): Promise<Account>
   disconnect?(account: AccountRecord): Promise<void>
   publish?(context: PublishContext): Promise<PublishResult>
+  /** Whether the platform can publish at a set time by itself (no app or computer needed then). */
+  supportsPlatformScheduling?: boolean
 }
 
 /** The access to an account was lost; the user must connect it again. */

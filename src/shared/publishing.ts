@@ -60,7 +60,7 @@ export type PublicationStatus =
   | 'manual_pending'
 
 export const PUBLICATION_STATUS_LABELS: Record<PublicationStatus, string> = {
-  draft: 'Rascunho',
+  draft: 'Pausada',
   queued: 'Na fila',
   scheduled: 'Agendada',
   publishing: 'Enviando',
@@ -84,7 +84,18 @@ export type PublicationFields = {
   upload?: { sessionUri: string; totalBytes: number; startedAt: string }
   /** Upload progress 0..1 while publishing. */
   progress?: number
+  /**
+   * 'platform': the platform publishes at scheduledAt (YouTube `publishAt`; the video is uploaded right away as private).
+   * 'local': the app starts the upload (or reminds you, for manual destinations) at scheduledAt; the computer must be on.
+   */
+  scheduleMode?: ScheduleMode
+  /** The scheduled time passed while the app wasn't running; waits for the user instead of publishing late. */
+  missed?: boolean
+  /** Paused by the user (status 'draft'); resume restores the schedule. */
+  paused?: boolean
 }
+
+export type ScheduleMode = 'platform' | 'local'
 
 export type Publication = {
   id: string
@@ -183,12 +194,15 @@ export const DestinationInputSchema = z
         madeForKids: z.boolean().optional(),
         categoryId: z.string().regex(/^\d{1,3}$/).optional(),
         tags: z.array(z.string().trim().min(1).max(100)).max(100).optional(),
-        notifySubscribers: z.boolean().optional()
+        notifySubscribers: z.boolean().optional(),
+        scheduleMode: z.enum(['platform', 'local']).optional()
       })
-      .strict()
+      .strict(),
+    /** ISO date-time; null = publish now. */
+    scheduledAt: z.string().datetime({ offset: true }).nullable().default(null)
   })
   .strict()
-export type DestinationInput = z.infer<typeof DestinationInputSchema>
+export type DestinationInput = z.input<typeof DestinationInputSchema>
 
 export const CreatePublicationsInputSchema = z
   .object({
@@ -221,6 +235,60 @@ export const PublicationListInputSchema = z
   .strict()
 
 export type CreatePublicationsResult = { created: Publication[] }
+
+export const RescheduleInputSchema = z
+  .object({ id: uuid('Publicação inválida'), scheduledAt: z.string().datetime({ offset: true }) })
+  .strict()
+
+/** A publication in the queue/calendar, with its project for filtering and colors. */
+export type QueueItem = PublicationSummary & { projectId: string | null }
+
+export const NextSlotsInputSchema = z
+  .object({ accountId: uuid('Conta inválida'), count: z.number().int().min(1).max(20).default(1), after: z.string().datetime({ offset: true }).optional() })
+  .strict()
+
+export const QueueRangeInputSchema = z
+  .object({ from: z.string().datetime({ offset: true }), to: z.string().datetime({ offset: true }) })
+  .strict()
+
+/* ------------------------------------------------------------------ */
+/* Posting preferences (queue settings)                               */
+/* ------------------------------------------------------------------ */
+
+/** 0 = Sunday … 6 = Saturday. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
+export const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as const
+
+export type QueueSettings = {
+  accountId: string
+  enabled: boolean
+  days: Weekday[]
+  /** Local times "HH:MM", sorted. */
+  times: string[]
+  timezone: string
+}
+
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário no formato HH:MM')
+
+export const QueueSettingsInputSchema = z
+  .object({
+    accountId: uuid('Conta inválida'),
+    enabled: z.boolean(),
+    days: z.array(z.number().int().min(0).max(6)).max(7),
+    times: z.array(time).max(12),
+    timezone: z.string().min(1).max(64)
+  })
+  .strict()
+
+/** Default planning slots: every day at 12:00 and 19:00. A preference, not a promise of reach. */
+export function defaultQueueSettings(accountId: string, timezone: string): QueueSettings {
+  return { accountId, enabled: true, days: [0, 1, 2, 3, 4, 5, 6], times: ['12:00', '19:00'], timezone }
+}
+
+/** A publication occupying a time slot (for free-slot search and calendars). */
+export function isScheduledLike(p: Pick<Publication, 'status'>): boolean {
+  return p.status === 'scheduled' || p.status === 'queued' || p.status === 'publishing' || p.status === 'draft'
+}
 
 export type PublicationEvent =
   | { type: 'publication'; publication: Publication }

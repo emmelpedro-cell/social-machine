@@ -26,7 +26,9 @@ import type {
   PlatformInfo,
   Publication,
   PublicationEvent,
-  PublicationSummary
+  PublicationSummary,
+  QueueItem,
+  QueueSettings
 } from './publishing'
 import type {
   AddWatchFolderResult,
@@ -156,6 +158,19 @@ export interface SmApi {
     /** Remarks per platform for a version (e.g. "will be a Short"). */
     notes(versionId: string): Promise<IpcResult<Record<PlatformId, string[]>>>
     onEvent(listener: (event: PublicationEvent) => void): () => void
+    /** Publications planned in a range plus everything waiting for the user. */
+    queue(from: string, to: string): Promise<IpcResult<QueueItem[]>>
+    reschedule(id: string, scheduledAt: string): Promise<IpcResult<Publication>>
+    publishNow(id: string): Promise<IpcResult<Publication>>
+    pause(id: string): Promise<IpcResult<Publication>>
+    resume(id: string): Promise<IpcResult<Publication>>
+  }
+  queue: {
+    /** Posting preferences of every account. */
+    settings(): Promise<IpcResult<QueueSettings[]>>
+    saveSettings(settings: QueueSettings): Promise<IpcResult<QueueSettings>>
+    /** Next free posting slots of an account (ISO times). */
+    nextSlots(accountId: string, count?: number, after?: string): Promise<IpcResult<string[]>>
   }
   settings: {
     get(): Promise<IpcResult<Settings>>

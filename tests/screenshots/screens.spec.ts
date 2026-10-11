@@ -168,6 +168,52 @@ test('screenshots', async () => {
     { timeout: 60_000 }
   )
 
+  // A few scheduled posts for the queue and calendar.
+  await page.evaluate(async () => {
+    const contents = await window.sm.media.list()
+    const accounts = await window.sm.accounts.list()
+    if (!contents.ok || !accounts.ok) return
+    const tiktok = accounts.data.find((a) => a.platformId === 'tiktok')!
+    const youtube = accounts.data.find((a) => a.platformId === 'youtube')!
+    const content = contents.data.find((c) => c.fileName === 'Golaço de bicicleta.mp4')!
+    const versions = await window.sm.versions.list(content.id)
+    if (!versions.ok || !versions.data[0]) return
+    const day = (n: number, h: number) => {
+      const d = new Date()
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, h, 0).toISOString()
+    }
+    const plan: [string, number, number, boolean][] = [
+      [tiktok.id, 1, 12, false],
+      [youtube.id, 1, 19, true],
+      [tiktok.id, 3, 19, false],
+      [youtube.id, 5, 12, true],
+      [tiktok.id, 8, 12, false]
+    ]
+    for (const [accountId, n, h, yt] of plan) {
+      await window.sm.publications.create({
+        versionId: versions.data[0].id,
+        destinations: [
+          {
+            accountId,
+            title: 'Golaço de bicicleta no fim do jogo',
+            caption: 'Que golaço! ⚽',
+            hashtags: ['#futebol'],
+            fields: yt ? { privacy: 'public', madeForKids: false, categoryId: '17', scheduleMode: 'local' } : {},
+            scheduledAt: day(n, h)
+          }
+        ],
+        allowRepeat: true,
+        requestId: crypto.randomUUID()
+      })
+    }
+  })
+  await navigate(page, 'Fila')
+  await expect(page.getByTestId('queue-day').first()).toBeVisible()
+  await shot(page, '08-fila')
+  await navigate(page, 'Calendário')
+  await page.getByTestId('cal-item').first().click()
+  await shot(page, '09-calendario')
+
   // Library with details open.
   await page.getByTestId('filter-project').selectOption('all')
   await openCard(page, 'Golaço de bicicleta.mp4')

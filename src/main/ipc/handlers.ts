@@ -46,7 +46,12 @@ import {
   ConnectYouTubeInputSchema,
   CreatePublicationsInputSchema,
   MarkPublishedInputSchema,
+  NextSlotsInputSchema,
   PublicationIdInputSchema,
+  QueueRangeInputSchema,
+  QueueSettingsInputSchema,
+  RescheduleInputSchema,
+  type Weekday,
   PublicationListInputSchema,
   UpdateAccountInputSchema,
   YouTubeCredentialsInputSchema,
@@ -56,6 +61,8 @@ import {
 import type { AccountsRepository } from '../repositories/accounts'
 import type { PublicationsRepository } from '../repositories/publications'
 import type { PublishService } from '../publishing/publish-service'
+import type { QueueSettingsRepository } from '../repositories/queue-settings'
+import { nextFreeSlots } from '../../shared/schedule'
 import type { YouTubeClientConfig } from '../connectors/config'
 import type { PresetsRepository } from '../repositories/presets'
 import type { VersionsRepository } from '../repositories/versions'
@@ -108,6 +115,7 @@ export type HandlerDeps = {
     accounts: AccountsRepository
     publications: PublicationsRepository
     service: PublishService
+    queueSettings: QueueSettingsRepository
     youtubeConfig: YouTubeClientConfig
     connectYouTube: (projectIds: string[]) => Promise<Account>
     disconnect: (id: string) => Promise<Account>
@@ -517,6 +525,47 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
     [IpcChannels.publicationsNotes]: defineHandler({
       schema: VersionIdInputSchema,
       handle: ({ id }) => publishing.service.notes(id)
+    }),
+    [IpcChannels.publicationsQueue]: defineHandler({
+      schema: QueueRangeInputSchema,
+      handle: (range) =>
+        publishing.publications.listQueue({ from: new Date(range.from).toISOString(), to: new Date(range.to).toISOString() })
+    }),
+    [IpcChannels.publicationsReschedule]: defineHandler({
+      schema: RescheduleInputSchema,
+      handle: ({ id, scheduledAt }) => publishing.service.reschedule(id, scheduledAt)
+    }),
+    [IpcChannels.publicationsPublishNow]: defineHandler({
+      schema: PublicationIdInputSchema,
+      handle: ({ id }) => publishing.service.publishNow(id)
+    }),
+    [IpcChannels.publicationsPause]: defineHandler({
+      schema: PublicationIdInputSchema,
+      handle: ({ id }) => publishing.service.pause(id)
+    }),
+    [IpcChannels.publicationsResume]: defineHandler({
+      schema: PublicationIdInputSchema,
+      handle: ({ id }) => publishing.service.resume(id)
+    }),
+    [IpcChannels.queueSettingsList]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => publishing.queueSettings.all(publishing.accounts.list().map((a) => a.id))
+    }),
+    [IpcChannels.queueSettingsSave]: defineHandler({
+      schema: QueueSettingsInputSchema,
+      handle: (input) => {
+        publishing.accounts.get(input.accountId) // must exist
+        return publishing.queueSettings.save({ ...input, days: input.days as Weekday[] })
+      }
+    }),
+    [IpcChannels.queueNextSlots]: defineHandler({
+      schema: NextSlotsInputSchema,
+      handle: ({ accountId, count, after }) => {
+        publishing.accounts.get(accountId)
+        const start = after ? new Date(after) : new Date()
+        const occupied = publishing.publications.plannedTimes(accountId, new Date(start.getTime() - 3_600_000).toISOString())
+        return nextFreeSlots(publishing.queueSettings.get(accountId), occupied, start, count).map((d) => d.toISOString())
+      }
     }),
 
     [IpcChannels.settingsGet]: defineHandler({

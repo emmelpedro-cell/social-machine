@@ -79,7 +79,6 @@ test('the media protocol only serves library contents', async () => {
 test('later-phase areas say what is coming instead of showing fake controls', async () => {
   const { app, page } = await launchApp(dataDir)
   for (const [label, heading] of [
-    ['Fila', 'Fila de publicação'],
     ['Analytics', 'Analytics'],
     ['Inbox', 'Inbox']
   ] as const) {

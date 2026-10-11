@@ -38,6 +38,7 @@ export function isShort(version: PublishableVersion): boolean {
 
 /** YouTube through the official Data API v3 (uploads in their own quota bucket of 100 per day per project). */
 export class YouTubeConnector implements Connector {
+  readonly supportsPlatformScheduling = true
   private readonly endpoints: GoogleEndpoints
   private readonly now: () => number
 
@@ -140,6 +141,11 @@ export class YouTubeConnector implements Connector {
   async publish(ctx: PublishContext): Promise<PublishResult> {
     const { publication, version } = ctx
     const fields = publication.fields
+    // YouTube publishes by itself at the scheduled time: upload now as private with publishAt.
+    const publishAt =
+      fields.scheduleMode === 'platform' && publication.scheduledAt && new Date(publication.scheduledAt).getTime() > this.now() + 60_000
+        ? new Date(publication.scheduledAt).toISOString()
+        : undefined
     try {
       const { videoId } = await uploadVideo({
         fetch: this.options.fetch,
@@ -152,7 +158,8 @@ export class YouTubeConnector implements Connector {
           tags: fields.tags ?? publication.hashtags,
           categoryId: fields.categoryId ?? '17',
           privacyStatus: fields.privacy ?? 'public',
-          madeForKids: fields.madeForKids ?? false
+          madeForKids: fields.madeForKids ?? false,
+          publishAt
         },
         notifySubscribers: fields.notifySubscribers ?? true,
         session: fields.upload ? { sessionUri: fields.upload.sessionUri, totalBytes: fields.upload.totalBytes } : null,
@@ -168,7 +175,7 @@ export class YouTubeConnector implements Connector {
       })
       if (ctx.account.connectionStatus !== 'connected') this.options.accounts.setStatus(ctx.account.id, 'connected')
       const url = isShort(version) ? `https://www.youtube.com/shorts/${videoId}` : `https://www.youtube.com/watch?v=${videoId}`
-      return { externalPostId: videoId, externalUrl: url }
+      return { externalPostId: videoId, externalUrl: url, scheduledOnPlatform: Boolean(publishAt) }
     } catch (error) {
       if (error instanceof YouTubeApiError && error.unauthorized) {
         this.options.accounts.setStatus(ctx.account.id, 'expired', error.message)

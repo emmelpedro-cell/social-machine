@@ -71,6 +71,11 @@ export class AccountsRepository {
     return this.toRecord(row)
   }
 
+  find(id: string): AccountRecord | null {
+    const row = this.db.prepare(`SELECT ${COLUMNS} FROM accounts WHERE id = ?`).get(id) as Row | undefined
+    return row ? this.toRecord(row) : null
+  }
+
   get(id: string): Account {
     return AccountsRepository.publicView(this.record(id))
   }

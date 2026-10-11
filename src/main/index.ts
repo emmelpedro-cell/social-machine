@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, protocol, safeStorage, session, shell, Tray } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, Notification, protocol, safeStorage, session, shell, Tray } from 'electron'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { IpcEvents } from '../shared/channels'
@@ -37,6 +37,7 @@ import { GOOGLE_ENDPOINTS, type GoogleEndpoints } from './connectors/youtube/oau
 import { PublishService } from './publishing/publish-service'
 import { AccountsRepository } from './repositories/accounts'
 import { PublicationsRepository } from './repositories/publications'
+import { QueueSettingsRepository } from './repositories/queue-settings'
 import { FileSecretStore } from './secrets/token-store'
 
 const APP_NAME = 'Social Machine'
@@ -70,6 +71,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => showWindow())
+  // Windows shows desktop notifications only for apps with an AppUserModelID (same as the installer's appId).
+  if (process.platform === 'win32') app.setAppUserModelId('studio.luneta.socialmachine')
   app.whenReady().then(start).catch(fatal)
 }
 
@@ -186,6 +189,7 @@ function start(): void {
   const youtubeConfig = new YouTubeClientConfig(opened.db, secrets)
   const accounts = new AccountsRepository(opened.db)
   const publications = new PublicationsRepository(opened.db)
+  const queueSettings = new QueueSettingsRepository(opened.db)
   const youtube = new YouTubeConnector({
     accounts,
     secrets,
@@ -202,7 +206,13 @@ function start(): void {
     versions,
     connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
     logger: log.child('publish'),
-    emit: sendPublicationEvent
+    emit: sendPublicationEvent,
+    notify: (title, body) => {
+      if (!Notification.isSupported()) return
+      const notification = new Notification({ title, body })
+      notification.on('click', () => showWindow())
+      notification.show()
+    }
   })
   publishService = publisher
 
@@ -321,6 +331,7 @@ function start(): void {
       accounts,
       publications,
       service: publisher,
+      queueSettings,
       youtubeConfig,
       connectYouTube: async (projectIds) => {
         const account = await youtube.connect(projectIds)

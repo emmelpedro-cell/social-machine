@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { WORKFLOW_LABELS, type ContentItem, type WorkflowStatus } from '../../../shared/media'
 import type { Project } from '../../../shared/schemas'
 import type { WatchFolderStatus } from '../../../shared/watch'
@@ -9,6 +9,7 @@ import type { LibraryFilters } from './LibraryScreen'
 import type { NoticeState } from '../components/Notice'
 import { PublicationsList } from '../publishing/PublicationsList'
 import { usePublications } from '../publishing/usePublishing'
+import { needsAttention, useQueue } from '../queue/useQueue'
 
 type Props = {
   projects: Project[] | null
@@ -18,13 +19,24 @@ type Props = {
   onOpenLibrary: (filters: LibraryFilters) => void
   onOpenProjects: () => void
   onOpenSettings: () => void
+  onOpenQueue: () => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
 }
 
-export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibrary, onOpenProjects, onOpenSettings, onNotice, onError }: Props) {
-  const { publications } = usePublications(undefined, 8)
-  const pendingOrFailed = (publications ?? []).filter((p) => p.status === 'failed' || p.status === 'manual_pending').length
+export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibrary, onOpenProjects, onOpenSettings, onOpenQueue, onNotice, onError }: Props) {
+  const { publications } = usePublications(undefined, 5)
+  const [queueRange] = useState(() => ({ from: new Date(), to: new Date(Date.now() + 14 * 86_400_000) }))
+  const { items: queue } = useQueue(queueRange.from, queueRange.to)
+  const attention = (queue ?? []).filter(needsAttention).length
+  const upcoming = useMemo(
+    () =>
+      (queue ?? [])
+        .filter((p) => p.status === 'scheduled' && !p.fields.missed && p.scheduledAt)
+        .sort((a, b) => a.scheduledAt!.localeCompare(b.scheduledAt!))
+        .slice(0, 5),
+    [queue]
+  )
   const stats = useMemo(() => {
     const byWorkflow: Record<WorkflowStatus, number> = { imported: 0, needs_review: 0, editing: 0, ready: 0, archived: 0 }
     let withoutProject = 0
@@ -186,17 +198,35 @@ export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibr
 
           <section className="panel">
             <div className="panel-head">
-              <h2>Publicações</h2>
+              <h2>Próximas publicações</h2>
+              <button type="button" className="link-btn" onClick={onOpenQueue}>
+                Abrir fila
+              </button>
             </div>
-            {pendingOrFailed > 0 && (
+            {attention > 0 && (
               <p className="small hint" data-testid="dash-pub-attention">
-                {pendingOrFailed} publicação(ões) precisam de atenção (falharam ou aguardam você publicar).
+                {attention} publicação(ões) precisam de você (falharam, aguardam você publicar, perderam o horário ou estão pausadas).{' '}
+                <button type="button" className="link-btn" onClick={onOpenQueue}>
+                  Ver
+                </button>
               </p>
             )}
+            <div data-testid="dash-upcoming">
+              {queue && upcoming.length === 0 ? (
+                <p className="muted small">Nada agendado para os próximos 14 dias.</p>
+              ) : (
+                <PublicationsList publications={queue ? upcoming : null} showContent onNotice={onNotice} onError={onError} />
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-head">
+              <h2>Atividade recente</h2>
+            </div>
             <div data-testid="dash-publications">
               <PublicationsList publications={publications} showContent onNotice={onNotice} onError={onError} />
             </div>
-            <p className="muted small">Agendamento e calendário chegam na Fase 4.</p>
           </section>
         </div>
       </div>

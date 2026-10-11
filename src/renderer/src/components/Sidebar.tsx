@@ -17,19 +17,21 @@ type Props = {
   onNavigate: (id: ScreenId) => void
   version?: string
   needsReview: number
+  /** Publications waiting for the user (manual, failed, missed, paused). */
+  attention: number
 }
 
-export function Sidebar({ current, onNavigate, version, needsReview }: Props) {
+export function Sidebar({ current, onNavigate, version, needsReview, attention }: Props) {
   const main: Item[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'library', label: 'Biblioteca', badge: needsReview },
     { id: 'editor', label: 'Editor' },
+    { id: 'queue', label: 'Fila', badge: attention },
+    { id: 'calendar', label: 'Calendário' },
     { id: 'projects', label: 'Projetos' },
     { id: 'accounts', label: 'Contas' }
   ]
   const later: Item[] = [
-    { id: 'queue', label: 'Fila', phase: 4 },
-    { id: 'calendar', label: 'Calendário', phase: 4 },
     { id: 'analytics', label: 'Analytics', phase: 5 },
     { id: 'inbox', label: 'Inbox', phase: 6 }
   ]
@@ -49,7 +51,7 @@ export function Sidebar({ current, onNavigate, version, needsReview }: Props) {
           </span>
         )}
         {!item.phase && item.badge ? (
-          <span className="nav-badge" title={`${item.badge} para revisar`} data-testid={`nav-badge-${item.id}`}>
+          <span className="nav-badge" title={item.id === 'queue' ? `${item.badge} precisam de você` : `${item.badge} para revisar`} data-testid={`nav-badge-${item.id}`}>
             {item.badge}
           </span>
         ) : null}
@@ -85,7 +87,7 @@ export function Sidebar({ current, onNavigate, version, needsReview }: Props) {
         >
           Configurações
         </button>
-        <p className="build-tag">Fase 3 · publicação{version ? ` · v${version}` : ''}</p>
+        <p className="build-tag">Fase 4 · fila e calendário{version ? ` · v${version}` : ''}</p>
       </div>
     </nav>
   )

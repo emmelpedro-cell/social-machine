@@ -69,6 +69,8 @@ export type VideoMetadata = {
   categoryId: string
   privacyStatus: 'public' | 'unlisted' | 'private'
   madeForKids: boolean
+  /** ISO time: YouTube publishes the (private) video then. Requires privacyStatus 'private'. */
+  publishAt?: string
 }
 
 /** YouTube rejects "<" and ">" in titles and descriptions; titles are limited to 100 characters. */
@@ -160,9 +162,10 @@ export async function uploadVideo(options: UploadOptions): Promise<{ videoId: st
             categoryId: metadata.categoryId
           },
           status: {
-            privacyStatus: metadata.privacyStatus,
+            privacyStatus: metadata.publishAt ? 'private' : metadata.privacyStatus,
             selfDeclaredMadeForKids: metadata.madeForKids,
-            embeddable: true
+            embeddable: true,
+            ...(metadata.publishAt ? { publishAt: metadata.publishAt } : {})
           }
         })
       },
