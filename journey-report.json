@@ -1,0 +1,99 @@
+{
+  "steps": [
+    {
+      "step": "01-primeiro-uso",
+      "seconds": 1.2
+    },
+    {
+      "step": "02-projetos-criados",
+      "seconds": 1
+    },
+    {
+      "step": "03-pasta-drop-machine",
+      "seconds": 1.1
+    },
+    {
+      "step": "04-biblioteca-clipes-chegaram",
+      "seconds": 12.1
+    },
+    {
+      "step": "05-detalhes-do-clipe",
+      "seconds": 0.8
+    },
+    {
+      "step": "06-editor-enquadramento-e-texto",
+      "seconds": 1.2
+    },
+    {
+      "step": "07-editor-versao-exportada",
+      "seconds": 6.2
+    },
+    {
+      "step": "08-contas-conectadas",
+      "seconds": 1.1
+    },
+    {
+      "step": "09-publicar-agendando",
+      "seconds": 1.1
+    },
+    {
+      "step": "10-fila-agendadas",
+      "seconds": 1
+    },
+    {
+      "step": "11-calendario-semana",
+      "seconds": 0.8
+    },
+    {
+      "step": "12-fila-youtube-publicado-tiktok-aguardando",
+      "seconds": 0.9
+    },
+    {
+      "step": "13-fila-tudo-publicado",
+      "seconds": 1
+    },
+    {
+      "step": "14-analytics-youtube-coletado",
+      "seconds": 1.1
+    },
+    {
+      "step": "15-desempenho-do-conteudo",
+      "seconds": 1.3
+    },
+    {
+      "step": "16-analytics-comparando-plataformas",
+      "seconds": 0.7
+    },
+    {
+      "step": "17-tendencias-e-ideias",
+      "seconds": 0.7
+    },
+    {
+      "step": "18-inbox-comentarios-chegaram",
+      "seconds": 1.1
+    },
+    {
+      "step": "19-inbox-resposta-enviada",
+      "seconds": 1
+    },
+    {
+      "step": "20-biblioteca-publicado",
+      "seconds": 0.7
+    },
+    {
+      "step": "21-dashboard-final",
+      "seconds": 0.7
+    }
+  ],
+  "rendererErrors": [],
+  "logErrors": [],
+  "logWarnings": [],
+  "googleRequests": 11,
+  "uploads": 1,
+  "replies": [
+    {
+      "parentId": "c1",
+      "text": "É o campeão peso-leve do evento de sábado!"
+    }
+  ]
+}
