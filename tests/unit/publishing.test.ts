@@ -364,7 +364,7 @@ describe('publishing', () => {
     const dir = join(root.path, `secrets-${randomUUID()}`)
     const cipher = {
       isAvailable: () => true,
-      encrypt: (s: string) => Buffer.from(s, 'utf8').map((b) => b ^ 0x5a),
+      encrypt: (s: string) => Buffer.from(Buffer.from(s, 'utf8').map((b) => b ^ 0x5a)),
       decrypt: (b: Buffer) => Buffer.from(b.map((x) => x ^ 0x5a)).toString('utf8')
     }
     const store = new FileSecretStore(dir, cipher)
