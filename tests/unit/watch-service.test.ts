@@ -98,7 +98,7 @@ describe('WatchService', () => {
   })
   afterAll(() => root.cleanup())
 
-  const makeService = (options: { watchFactory?: WatchFactory; scanIntervalMs?: number } = {}) =>
+  const makeService = (options: { watchFactory?: WatchFactory; scanIntervalMs?: number; stabilityIntervalMs?: number } = {}) =>
     new WatchService({
       folders,
       knownFiles: () => library.known,
@@ -108,7 +108,7 @@ describe('WatchService', () => {
         statuses++
       },
       scanIntervalMs: () => options.scanIntervalMs ?? 60_000,
-      stabilityIntervalMs: 40,
+      stabilityIntervalMs: options.stabilityIntervalMs ?? 40,
       stableChecksRequired: 2,
       watchFactory: options.watchFactory
     })
@@ -139,7 +139,9 @@ describe('WatchService', () => {
 
   it('waits until a file stops growing before importing it', async () => {
     addFolder()
-    service = makeService()
+    // Writes every ~25 ms; a file must be unchanged for 2 checks 150 ms apart, so a slow machine can't
+    // make a pause between two writes look like a finished file.
+    service = makeService({ stabilityIntervalMs: 150 })
     await service.start()
 
     const file = join(dir, 'render.mp4')

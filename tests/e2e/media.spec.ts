@@ -147,7 +147,8 @@ test('watches the Drop Machine output folder: existing and new clips arrive once
   await expect.poll(() => libraryFiles(page), { timeout: 60_000 }).toContain('MMA Drop 001.mov')
 
   // A new clip, written over a couple of seconds, goes to MMA as "needs review", once.
-  await writeProgressively(fx.vertical, join(dropOutput, 'MMA Drop 002.mp4'))
+  // (A different clip from the ones imported before: the same content would be skipped as a duplicate.)
+  await writeProgressively(fx.vertical2, join(dropOutput, 'MMA Drop 002.mp4'))
   await openLibrary(page)
   const fresh = card(page, 'MMA Drop 002.mp4')
   await expect(fresh).toHaveAttribute('data-state', 'ready', { timeout: 60_000 })
