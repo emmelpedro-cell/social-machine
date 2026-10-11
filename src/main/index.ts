@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, session, shell, Tray } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, protocol, safeStorage, session, shell, Tray } from 'electron'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { IpcEvents } from '../shared/channels'
@@ -29,6 +29,15 @@ import { EncoderSelector } from './editor/encoders'
 import { RenderService } from './editor/render-service'
 import { PresetsRepository } from './repositories/presets'
 import { VersionsRepository } from './repositories/versions'
+import type { PublicationEvent } from '../shared/publishing'
+import { YouTubeClientConfig } from './connectors/config'
+import { ManualConnector } from './connectors/manual'
+import { YouTubeConnector } from './connectors/youtube/connector'
+import { GOOGLE_ENDPOINTS, type GoogleEndpoints } from './connectors/youtube/oauth'
+import { PublishService } from './publishing/publish-service'
+import { AccountsRepository } from './repositories/accounts'
+import { PublicationsRepository } from './repositories/publications'
+import { FileSecretStore } from './secrets/token-store'
 
 const APP_NAME = 'Social Machine'
 const isDev = !app.isPackaged
@@ -51,6 +60,7 @@ let logger: Logger | null = null
 let importService: ImportService | null = null
 let watchService: WatchService | null = null
 let renderService: RenderService | null = null
+let publishService: PublishService | null = null
 let settingsRepo: SettingsRepository | null = null
 let quitting = false
 let trayHintShown = false
@@ -167,6 +177,35 @@ function start(): void {
   })
   renderService = renderer
 
+  // ---- Accounts and publishing --------------------------------------------
+  const secrets = new FileSecretStore(join(layout.appData, 'secrets'), {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (plain) => safeStorage.encryptString(plain),
+    decrypt: (data) => safeStorage.decryptString(data)
+  })
+  const youtubeConfig = new YouTubeClientConfig(opened.db, secrets)
+  const accounts = new AccountsRepository(opened.db)
+  const publications = new PublicationsRepository(opened.db)
+  const youtube = new YouTubeConnector({
+    accounts,
+    secrets,
+    config: youtubeConfig,
+    // Node's fetch (undici) in the main process: requests never pass through the renderer.
+    fetch: (url, init) => fetch(url, init),
+    openBrowser: (url) => shell.openExternal(url),
+    logger: log.child('youtube'),
+    endpoints: googleEndpoints()
+  })
+  const publisher = new PublishService({
+    publications,
+    accounts,
+    versions,
+    connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
+    logger: log.child('publish'),
+    emit: sendPublicationEvent
+  })
+  publishService = publisher
+
   protocol.handle(MEDIA_SCHEME, (request) =>
     handleMediaRequest(request, { repo: contents, thumbnailsDirectory: layout.thumbnails, versions })
   )
@@ -193,6 +232,7 @@ function start(): void {
       const error = await shell.openPath(layout.logs)
       if (error) throw new Error(`Não foi possível abrir a pasta de logs: ${error}`)
     },
+    copyText: (text) => clipboard.writeText(text),
     chooseDataDirectory: () => chooseDataDirectory(layout),
     chooseExportDirectory: async () => {
       const path = await pickFolder('Escolha a pasta de exportação')
@@ -277,6 +317,37 @@ function start(): void {
         else throw new NotFoundError('O arquivo dessa versão não existe mais.')
       }
     },
+    publishing: {
+      accounts,
+      publications,
+      service: publisher,
+      youtubeConfig,
+      connectYouTube: async (projectIds) => {
+        const account = await youtube.connect(projectIds)
+        sendPublicationEvent({ type: 'accounts' })
+        showWindow() // bring the app back after the browser
+        return account
+      },
+      disconnect: async (id) => {
+        const record = accounts.record(id)
+        if (!record.manual && record.platformId === 'youtube') await youtube.disconnect(record)
+        const { tokenRef } = accounts.disconnect(id)
+        if (tokenRef) secrets.delete(tokenRef)
+        log.info('Account disconnected', { id })
+        sendPublicationEvent({ type: 'accounts' })
+        return accounts.get(id)
+      },
+      remove: (id) => {
+        const { tokenRef } = accounts.remove(id)
+        if (tokenRef) secrets.delete(tokenRef)
+        log.info('Account removed', { id })
+        sendPublicationEvent({ type: 'accounts' })
+      },
+      openExternal: async (url) => {
+        if (!/^https:\/\//.test(url)) throw new NotFoundError('Link inválido.')
+        await shell.openExternal(url)
+      }
+    },
     onSettingsChanged: () => applyOsSettings()
   })
 
@@ -296,6 +367,7 @@ function start(): void {
 
   service.start()
   void renderer.start().catch((error) => log.error('Render recovery failed', { error }))
+  publisher.start()
   // Reconciliation: files created while the app was closed are found here.
   void watcher.start().catch((error) => log.error('Folder watching failed to start', { error }))
 
@@ -404,6 +476,24 @@ async function pickFolder(title: string): Promise<string | null> {
 
 function sendMediaEvent(event: MediaEvent): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IpcEvents.media, event)
+}
+
+function sendPublicationEvent(event: PublicationEvent): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IpcEvents.publishing, event)
+}
+
+/**
+ * Google endpoints. Development and test builds may point them at a local
+ * stand-in (SM_GOOGLE_ENDPOINTS, JSON); packaged builds always use Google.
+ */
+function googleEndpoints(): GoogleEndpoints {
+  const override = process.env['SM_GOOGLE_ENDPOINTS']
+  if (!override || app.isPackaged) return GOOGLE_ENDPOINTS
+  try {
+    return { ...GOOGLE_ENDPOINTS, ...(JSON.parse(override) as Partial<GoogleEndpoints>) }
+  } catch {
+    return GOOGLE_ENDPOINTS
+  }
 }
 
 function sendVersionEvent(event: VersionEvent): void {
@@ -526,6 +616,8 @@ app.on('will-quit', () => {
     watchService?.stop()
     // Unfinished renders are marked as interrupted on the next start.
     renderService?.shutdown()
+    // Interrupted uploads continue from their saved session on the next start.
+    publishService?.shutdown()
     // Stop FFmpeg child processes; unfinished imports resume on the next start.
     importService?.shutdown()
     tray?.destroy()

@@ -14,6 +14,7 @@ import { ProjectsScreen } from './screens/ProjectsScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { PhasePlaceholder, PLACEHOLDERS, type PlaceholderId } from './screens/PhasePlaceholder'
 import { EditorScreen } from './screens/EditorScreen'
+import { AccountsScreen } from './screens/AccountsScreen'
 import { useVersionCounts } from './editor/useVersions'
 import type { EditSettings } from '../../shared/editor'
 
@@ -141,6 +142,8 @@ export function App() {
             onOpenLibrary={openLibrary}
             onOpenProjects={() => setScreen('projects')}
             onOpenSettings={() => setScreen('settings')}
+            onNotice={setNotice}
+            onError={showError}
           />
         )}
         {screen === 'library' && (
@@ -151,6 +154,7 @@ export function App() {
             initialFilters={libraryFilters.filters}
             versionCounts={versionCounts}
             onOpenEditor={openEditor}
+            onOpenAccounts={() => setScreen('accounts')}
             onNotice={setNotice}
             onError={showError}
           />
@@ -180,10 +184,12 @@ export function App() {
             assets={library.assets}
             projects={projectList}
             onOpen={openEditor}
+            onOpenAccounts={() => setScreen('accounts')}
             onNotice={setNotice}
             onError={showError}
           />
         )}
+        {screen === 'accounts' && <AccountsScreen projects={projectList} onNotice={setNotice} onError={showError} />}
         {(Object.keys(PLACEHOLDERS) as PlaceholderId[]).includes(screen as PlaceholderId) && (
           <PhasePlaceholder {...PLACEHOLDERS[screen as PlaceholderId]} />
         )}

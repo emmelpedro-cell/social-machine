@@ -19,6 +19,16 @@ import type {
   VersionEvent
 } from './editor'
 import type {
+  Account,
+  CreatePublicationsInput,
+  CreatePublicationsResult,
+  PlatformId,
+  PlatformInfo,
+  Publication,
+  PublicationEvent,
+  PublicationSummary
+} from './publishing'
+import type {
   AddWatchFolderResult,
   UpdateWatchFolderInput,
   WatchEvent,
@@ -43,6 +53,7 @@ export interface SmApi {
   app: {
     getInfo(): Promise<IpcResult<AppInfo>>
     openLogsFolder(): Promise<IpcResult<null>>
+    copyText(text: string): Promise<IpcResult<null>>
   }
   projects: {
     list(): Promise<IpcResult<ProjectSummary[]>>
@@ -114,6 +125,37 @@ export interface SmApi {
   editor: {
     /** The H.264 encoder exports will use on this machine. */
     encoder(): Promise<IpcResult<EncoderInfo>>
+  }
+  platforms: {
+    list(): Promise<IpcResult<PlatformInfo[]>>
+    /** Opens the platform's own upload page in the browser (manual publishing). */
+    openUpload(platformId: PlatformId): Promise<IpcResult<null>>
+  }
+  youtube: {
+    /** The configured client ID (the secret is never sent to the renderer). */
+    credentials(): Promise<IpcResult<{ clientId: string | null }>>
+    setCredentials(clientId: string, clientSecret: string): Promise<IpcResult<null>>
+    clearCredentials(): Promise<IpcResult<null>>
+  }
+  accounts: {
+    list(): Promise<IpcResult<Account[]>>
+    /** Opens Google's consent page in the browser and waits for the user to approve. */
+    connectYouTube(projectIds: string[]): Promise<IpcResult<Account>>
+    addManual(platformId: PlatformId, displayName: string, projectIds: string[]): Promise<IpcResult<Account>>
+    update(id: string, patch: { displayName?: string; projectIds?: string[] }): Promise<IpcResult<Account>>
+    disconnect(id: string): Promise<IpcResult<Account>>
+    remove(id: string): Promise<IpcResult<null>>
+  }
+  publications: {
+    list(filter?: { contentId?: string; limit?: number }): Promise<IpcResult<PublicationSummary[]>>
+    create(input: CreatePublicationsInput): Promise<IpcResult<CreatePublicationsResult>>
+    retry(id: string): Promise<IpcResult<Publication>>
+    cancel(id: string): Promise<IpcResult<Publication>>
+    markPublished(id: string, url: string): Promise<IpcResult<Publication>>
+    openUrl(id: string): Promise<IpcResult<null>>
+    /** Remarks per platform for a version (e.g. "will be a Short"). */
+    notes(versionId: string): Promise<IpcResult<Record<PlatformId, string[]>>>
+    onEvent(listener: (event: PublicationEvent) => void): () => void
   }
   settings: {
     get(): Promise<IpcResult<Settings>>

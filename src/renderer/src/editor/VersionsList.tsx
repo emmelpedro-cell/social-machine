@@ -11,6 +11,7 @@ export const versionUrl = (v: ContentVersion) => `sm-media://version/${v.id}?v=$
 type Props = {
   versions: ContentVersion[] | null
   onEditCopy?: (version: ContentVersion) => void
+  onPublish?: (version: ContentVersion) => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
   compact?: boolean
@@ -24,7 +25,7 @@ const ENCODER_LABEL: Record<string, string> = {
   h264_mf: 'Media Foundation'
 }
 
-export function VersionsList({ versions, onEditCopy, onNotice, onError, compact }: Props) {
+export function VersionsList({ versions, onEditCopy, onPublish, onNotice, onError, compact }: Props) {
   const [confirm, setConfirm] = useState<string | null>(null)
   const [playing, setPlaying] = useState<string | null>(null)
 
@@ -75,6 +76,11 @@ export function VersionsList({ versions, onEditCopy, onNotice, onError, compact 
           <div className="row wrap version-actions">
             {v.status === 'ready' && (
               <>
+                {onPublish && (
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => onPublish(v)} data-testid="publish-version">
+                    Publicar…
+                  </button>
+                )}
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPlaying(playing === v.id ? null : v.id)}>
                   {playing === v.id ? 'Fechar' : 'Assistir'}
                 </button>

@@ -77,6 +77,27 @@ TD-001 to TD-020 come from the Music Content Engine, whose Phase 1 code is the b
 **Decision:** Montserrat, Oswald (variable), Anton, Bebas Neue and Bangers are bundled with the renderer under the SIL Open Font License 1.1 (texts in `src/renderer/src/fonts/licenses`, shipped as `resources/font-licenses`). Arial Black, Impact, Segoe UI and Georgia are offered from Windows. Single-weight faces declare a weight range so the browser never synthesizes bold.
 **Why:** short-form video relies on a few heavy display faces; bundling guarantees they exist on every machine. Because text is rasterized by the app (TD-108), fonts never need to be passed to FFmpeg.
 
+### TD-112 — YouTube through the official Data API, with the user's own OAuth client
+
+**Decision:** the YouTube connector uses the Data API v3 with OAuth 2.0 for installed apps: the system browser opens Google's consent page, Google redirects to a loopback listener on `127.0.0.1:<random port>`, and the code is exchanged with PKCE (S256) and a `state` check. Scopes: `youtube.upload` and `youtube.readonly`. The user creates the OAuth client (type "Desktop app") in their own Google Cloud project and enters the client ID and secret in the app. Uploads use the resumable protocol in 8 MiB chunks (multiples of 256 KiB), with exponential backoff on 5xx/network errors and a status query (`Content-Range: bytes */N`) before continuing; the session URI is saved on the publication so an upload interrupted by a quit continues on the next start.
+**Facts checked (official docs, 2026-10-11):** `videos.insert` costs 1 unit in its own "Video Uploads" quota bucket of 100 calls/day; videos from unverified API projects are not restricted to private; desktop clients use the loopback redirect with PKCE; with an external OAuth app in "Testing" status, refresh tokens expire after 7 days (the UI says so and marks the account "Login expirado").
+**Why:** no third-party service or shared app credentials: the user owns the Google project, quota and consent screen, and nothing passes through a server we run. Requests are made from the main process with Node's fetch; tokens never reach the renderer.
+**Development/test hook:** `SM_GOOGLE_ENDPOINTS` (JSON) points the connector at a local stand-in, only in unpackaged builds. Unit and E2E tests use it with `tests/helpers/fake-google.ts`, which implements the documented token, PKCE and resumable-upload behaviour with switchable failures.
+
+### TD-113 — Secrets encrypted by the OS, outside the database
+
+**Decision:** OAuth tokens and the YouTube client secret are stored as individual files in `app-data/secrets/`, encrypted with Electron `safeStorage` (Windows DPAPI, tied to the Windows user). The database only holds an opaque `token_ref`. If encryption isn't available, connecting fails with a clear message instead of storing plaintext. Disconnecting revokes the grant at Google (best effort) and deletes the secret; the account and its publication history stay.
+**Alternatives:** keytar / Windows Credential Manager (keytar is unmaintained; a native module for no gain over DPAPI).
+
+### TD-114 — TikTok and Instagram start as manual destinations
+
+**Decision:** TikTok and Instagram accounts are "manual": publishing creates a publication in "Aguardando você publicar" with the version file, title, caption and hashtags ready (copy button, open the platform's upload page, show the file), and the user confirms it — optionally with the post link — once posted.
+**Why:** per TikTok's Content Posting API documentation, the app must be approved for `video.publish` and content from unaudited clients is restricted to private viewing; Instagram's publishing API requires a professional account linked to a Facebook page and an app reviewed by Meta. Pretending to publish, or automating the web UIs, would break the platforms' rules (spec §8, §16). The connector interface already supports an API publisher for these platforms once an approved app exists.
+
+### TD-115 — One publication per destination, idempotent requests
+
+**Decision:** a publish action creates one `publications` row per destination, each with its own status (queued → publishing → published | failed | cancelled; manual_pending → published). All destinations are validated before any is created. The renderer generates a request id when the dialog opens; the idempotency key is `<request id>:<account id>` (UNIQUE), so a repeated call creates nothing twice. Publishing the same version to the same account again requires an explicit confirmation. Uploads run in the background, at most one per account and two in total; failures don't affect other destinations; failed uploads can be retried (continuing the saved session when possible).
+
 ## Inherited decisions (Music Content Engine)
 
 ## TD-001 — electron-vite as the build tool
@@ -200,7 +221,7 @@ Additionally, every call checks `event.senderFrame.url` against the app's own pa
 ## Open decisions
 
 - **Export quality check** (Phase 2 follow-up): compare OpenH264 at 10 Mbit/s with the hardware encoders on real footage; raise the software bitrate if needed (TD-109).
-- **Token storage** (Phase 3): Electron `safeStorage` (DPAPI on Windows) in a file next to the database vs. Windows Credential Manager (keytar is unmaintained).
-- **Platform APIs** (before Phase 3): verify current YouTube Data API quota and audit rules, TikTok Content Posting API audit requirements (unaudited clients may only post privately), and Instagram Graph API account requirements against the official documentation at that time.
+- **TikTok/Instagram API publishing**: if an approved app becomes available, implement their connectors (TD-114).
+- **System proxy**: Node's fetch ignores the Windows proxy settings; switch to Electron's network stack if users behind proxies need it.
 - **Scheduler** (Phase 4): in-process timer with the `tasks` table vs. a helper process; how missed schedules are handled after the computer was off.
 - **Shared core with the MCE** (TD-101): when both apps are stable.

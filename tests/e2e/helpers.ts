@@ -19,11 +19,11 @@ export function makeDataDir(name: string): string {
 
 export async function launchApp(
   dataDir: string,
-  options: { executablePath?: string } = {}
+  options: { executablePath?: string; env?: Record<string, string> } = {}
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     ...(options.executablePath ? { executablePath: options.executablePath, args: [] } : { args: ['.'] }),
-    env: { ...process.env, SM_DATA_DIR: dataDir, NODE_ENV: 'test' }
+    env: { ...process.env, SM_DATA_DIR: dataDir, NODE_ENV: 'test', ...options.env }
   })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')

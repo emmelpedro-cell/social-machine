@@ -5,6 +5,7 @@
 export const IpcChannels = {
   appGetInfo: 'app:get-info',
   appOpenLogsFolder: 'app:open-logs-folder',
+  appCopyText: 'app:copy-text',
   projectsList: 'projects:list',
   projectsGet: 'projects:get',
   projectsCreate: 'projects:create',
@@ -47,6 +48,24 @@ export const IpcChannels = {
   presetsSave: 'presets:save',
   presetsDelete: 'presets:delete',
   editorEncoder: 'editor:encoder',
+  platformsList: 'platforms:list',
+  platformsOpenUpload: 'platforms:open-upload',
+  youtubeCredentialsGet: 'youtube:credentials-get',
+  youtubeCredentialsSet: 'youtube:credentials-set',
+  youtubeCredentialsClear: 'youtube:credentials-clear',
+  accountsList: 'accounts:list',
+  accountsConnectYouTube: 'accounts:connect-youtube',
+  accountsAddManual: 'accounts:add-manual',
+  accountsUpdate: 'accounts:update',
+  accountsDisconnect: 'accounts:disconnect',
+  accountsRemove: 'accounts:remove',
+  publicationsList: 'publications:list',
+  publicationsCreate: 'publications:create',
+  publicationsRetry: 'publications:retry',
+  publicationsCancel: 'publications:cancel',
+  publicationsMarkPublished: 'publications:mark-published',
+  publicationsOpenUrl: 'publications:open-url',
+  publicationsNotes: 'publications:notes',
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
   settingsChooseDataDirectory: 'settings:choose-data-directory',
@@ -62,5 +81,6 @@ export const ALL_IPC_CHANNELS: readonly IpcChannel[] = Object.values(IpcChannels
 export const IpcEvents = {
   media: 'media:event',
   watch: 'watch:event',
-  versions: 'versions:event'
+  versions: 'versions:event',
+  publishing: 'publishing:event'
 } as const

@@ -4,7 +4,7 @@ Central local de conteúdo para vídeos curtos: biblioteca, organização por pr
 
 Windows 10/11, local-first. Electron + React + TypeScript + Vite, SQLite (better-sqlite3), FFmpeg 9 (LGPL) incluído.
 
-**Estado atual: Fase 2 (editor).** Projetos, biblioteca de vídeos com metadados reais, importação manual, monitoramento da pasta de saída da Drop Machine com execução na área de notificação, e um editor que exporta versões (corte, proporção, enquadramento, textos, presets) sem nunca alterar o original. O banco já está preparado para contas, publicações, métricas, inbox e tarefas. Veja [`PROJECT_STATUS.md`](PROJECT_STATUS.md) para o que foi validado e o que ainda falta. O plano completo está em [`docs/SPEC.md`](docs/SPEC.md).
+**Estado atual: Fase 3 (contas e publicação).** Projetos, biblioteca de vídeos com metadados reais, importação manual, monitoramento da pasta de saída da Drop Machine com execução na área de notificação, e um editor que exporta versões (corte, proporção, enquadramento, textos, presets) sem nunca alterar o original. Publica no YouTube pela API oficial e registra publicações manuais no TikTok e no Instagram. O banco já está preparado para métricas, inbox e fila. Veja [`PROJECT_STATUS.md`](PROJECT_STATUS.md) para o que foi validado e o que ainda falta. O plano completo está em [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Requisitos
 
@@ -71,6 +71,26 @@ Na Biblioteca, abra um vídeo e clique em **Abrir no editor** (ou use **Editor**
 - **Presets:** salve proporção, enquadramento e estilo dos textos para o projeto ou para todos, e aplique em outros vídeos.
 - **Codificador:** usa a placa de vídeo (NVIDIA, Intel ou AMD) quando ela funciona e o OpenH264 quando não há. Dá para forçar o OpenH264 em Configurações.
 
+### Contas e publicação
+
+Em **Contas**:
+
+- **YouTube (API oficial):** configure uma vez o Client ID e a chave secreta. O passo a passo está na própria tela: projeto no Google Cloud, YouTube Data API v3, tela de consentimento com você como usuário de teste, ID do cliente do tipo "App para computador". Depois clique em **Conectar canal do YouTube**: o navegador abre, você autoriza e o app volta sozinho.
+  - Com o projeto do Google em modo "Teste", o login expira a cada 7 dias. A conta aparece como "Login expirado"; é só **Reconectar**, e o histórico continua.
+  - A API permite 100 envios por dia por projeto do Google.
+- **TikTok e Instagram (manual):** adicione o perfil (por exemplo, `@mma.cortes`). A publicação direta pelas APIs deles exige aprovação do app (no TikTok, apps não auditados só publicam como privado). Então o app prepara tudo e você confirma depois de publicar.
+- Associe cada conta aos projetos (botões de projeto na conta). Os tokens ficam criptografados pelo Windows, nunca no banco nem nos logs. **Desconectar** revoga o acesso e mantém o histórico.
+
+Para publicar: numa versão pronta (no editor ou no painel do vídeo na Biblioteca), clique em **Publicar…**.
+
+- Escolha os destinos. As contas do projeto do vídeo já vêm marcadas.
+- Preencha título, legenda e hashtags; as hashtags e o modelo de descrição do projeto vêm preenchidos.
+- Para o YouTube: visibilidade, categoria e "feito para crianças" (obrigatório).
+- Cada destino vira uma publicação independente: uma falha não afeta as outras.
+- O envio ao YouTube roda em segundo plano, com progresso. Se a internet cair ou o app fechar, ele continua de onde parou.
+- Nas manuais: **Abrir TikTok**, **Mostrar arquivo**, **Copiar legenda** e **Já publiquei** (com o link, se quiser).
+- Publicar a mesma versão de novo na mesma conta pede confirmação.
+
 ### Pasta da Drop Machine
 
 Em **Configurações → Pastas monitoradas**, use **Adicionar pasta da Drop Machine…** e escolha a pasta de saída (normalmente `C:\drop-machine\public\output`). Escolha também o projeto que os vídeos novos devem receber.
@@ -115,6 +135,7 @@ SocialMachine\
 │   ├── thumbnails\          miniaturas (um JPEG por vídeo)
 │   ├── temp\                arquivos de trabalho; sobras são apagadas ao iniciar
 │   ├── versions\            imagens dos textos de cada versão (para refazer uma exportação)
+│   ├── secrets\             tokens e chave do YouTube, criptografados pelo Windows
 │   └── projects, proxies, presets\   (próximas fases)
 └── exports\                 versões exportadas, uma subpasta por projeto
 ```
@@ -140,6 +161,9 @@ src/
 │   ├── media/     FFmpeg, probe, miniaturas, fila de importação, protocolo sm-media://
 │   ├── watch/     monitoramento de pastas (eventos + varredura + estabilidade)
 │   ├── editor/    plano de renderização FFmpeg, escolha do codificador, fila de exportação
+│   ├── connectors/ YouTube (OAuth + envio retomável) e destinos manuais
+│   ├── publishing/ fila de publicações por destino
+│   ├── secrets/   tokens criptografados pelo Windows (safeStorage)
 │   ├── repositories/  projetos, conteúdos, pastas monitoradas, configurações
 │   └── index.ts   janela, bandeja, instância única, iniciar com o Windows
 ├── preload/       a única ponte com a interface (window.sm)

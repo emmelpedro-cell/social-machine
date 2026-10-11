@@ -32,20 +32,9 @@ export function PhasePlaceholder({ title, phase, summary, planned }: Placeholder
   )
 }
 
-export type PlaceholderId = 'queue' | 'calendar' | 'inbox' | 'analytics' | 'accounts'
+export type PlaceholderId = 'queue' | 'calendar' | 'inbox' | 'analytics'
 
 export const PLACEHOLDERS: Record<PlaceholderId, PlaceholderProps> = {
-  accounts: {
-    title: 'Contas',
-    phase: 3,
-    summary: 'Conectar contas do YouTube, TikTok e Instagram pelas APIs oficiais (OAuth). Senhas nunca são guardadas.',
-    planned: [
-      'Adicionar, reconectar e desconectar contas',
-      'Associar contas a um ou mais projetos',
-      'Mostrar o que cada conta realmente permite (publicar, métricas, comentários)',
-      'Tokens guardados no cofre protegido do Windows, nunca no banco nem nos logs'
-    ]
-  },
   queue: {
     title: 'Fila de publicação',
     phase: 4,

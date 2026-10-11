@@ -4,6 +4,7 @@ import { IpcChannels, IpcEvents, type IpcChannel } from '../shared/channels'
 import type { MediaEvent } from '../shared/media'
 import type { WatchEvent } from '../shared/watch'
 import type { VersionEvent } from '../shared/editor'
+import type { PublicationEvent } from '../shared/publishing'
 import type { IpcResult } from '../shared/schemas'
 
 /**
@@ -16,7 +17,8 @@ const call = <T>(channel: IpcChannel, input?: unknown): Promise<IpcResult<T>> =>
 const api: SmApi = {
   app: {
     getInfo: () => call(IpcChannels.appGetInfo),
-    openLogsFolder: () => call(IpcChannels.appOpenLogsFolder)
+    openLogsFolder: () => call(IpcChannels.appOpenLogsFolder),
+    copyText: (text) => call(IpcChannels.appCopyText, { text })
   },
   projects: {
     list: () => call(IpcChannels.projectsList),
@@ -106,6 +108,39 @@ const api: SmApi = {
   },
   editor: {
     encoder: () => call(IpcChannels.editorEncoder)
+  },
+  platforms: {
+    list: () => call(IpcChannels.platformsList),
+    openUpload: (platformId) => call(IpcChannels.platformsOpenUpload, { platformId })
+  },
+  youtube: {
+    credentials: () => call(IpcChannels.youtubeCredentialsGet),
+    setCredentials: (clientId, clientSecret) => call(IpcChannels.youtubeCredentialsSet, { clientId, clientSecret }),
+    clearCredentials: () => call(IpcChannels.youtubeCredentialsClear)
+  },
+  accounts: {
+    list: () => call(IpcChannels.accountsList),
+    connectYouTube: (projectIds) => call(IpcChannels.accountsConnectYouTube, { projectIds }),
+    addManual: (platformId, displayName, projectIds) => call(IpcChannels.accountsAddManual, { platformId, displayName, projectIds }),
+    update: (id, patch) => call(IpcChannels.accountsUpdate, { id, ...patch }),
+    disconnect: (id) => call(IpcChannels.accountsDisconnect, { id }),
+    remove: (id) => call(IpcChannels.accountsRemove, { id })
+  },
+  publications: {
+    list: (filter) => call(IpcChannels.publicationsList, filter ?? {}),
+    create: (input) => call(IpcChannels.publicationsCreate, input),
+    retry: (id) => call(IpcChannels.publicationsRetry, { id }),
+    cancel: (id) => call(IpcChannels.publicationsCancel, { id }),
+    markPublished: (id, url) => call(IpcChannels.publicationsMarkPublished, { id, url }),
+    openUrl: (id) => call(IpcChannels.publicationsOpenUrl, { id }),
+    notes: (versionId) => call(IpcChannels.publicationsNotes, { id: versionId }),
+    onEvent: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, payload: PublicationEvent) => listener(payload)
+      ipcRenderer.on(IpcEvents.publishing, handler)
+      return () => {
+        ipcRenderer.removeListener(IpcEvents.publishing, handler)
+      }
+    }
   },
   settings: {
     get: () => call(IpcChannels.settingsGet),

@@ -6,6 +6,9 @@ import { WATCH_STATE_LABEL } from '../components/WatchFoldersPanel'
 import { formatRelative, plural } from '../format'
 import { assetState, displayName, thumbnailUrl } from '../media/format'
 import type { LibraryFilters } from './LibraryScreen'
+import type { NoticeState } from '../components/Notice'
+import { PublicationsList } from '../publishing/PublicationsList'
+import { usePublications } from '../publishing/usePublishing'
 
 type Props = {
   projects: Project[] | null
@@ -15,9 +18,13 @@ type Props = {
   onOpenLibrary: (filters: LibraryFilters) => void
   onOpenProjects: () => void
   onOpenSettings: () => void
+  onNotice: (n: NoticeState) => void
+  onError: (e: unknown) => void
 }
 
-export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibrary, onOpenProjects, onOpenSettings }: Props) {
+export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibrary, onOpenProjects, onOpenSettings, onNotice, onError }: Props) {
+  const { publications } = usePublications(undefined, 8)
+  const pendingOrFailed = (publications ?? []).filter((p) => p.status === 'failed' || p.status === 'manual_pending').length
   const stats = useMemo(() => {
     const byWorkflow: Record<WorkflowStatus, number> = { imported: 0, needs_review: 0, editing: 0, ready: 0, archived: 0 }
     let withoutProject = 0
@@ -181,10 +188,15 @@ export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibr
             <div className="panel-head">
               <h2>Publicações</h2>
             </div>
-            <p className="muted small">
-              Agendadas, com falha e próximas publicações aparecem aqui a partir das Fases 3 e 4, quando as contas forem
-              conectadas pelas APIs oficiais.
-            </p>
+            {pendingOrFailed > 0 && (
+              <p className="small hint" data-testid="dash-pub-attention">
+                {pendingOrFailed} publicação(ões) precisam de atenção (falharam ou aguardam você publicar).
+              </p>
+            )}
+            <div data-testid="dash-publications">
+              <PublicationsList publications={publications} showContent onNotice={onNotice} onError={onError} />
+            </div>
+            <p className="muted small">Agendamento e calendário chegam na Fase 4.</p>
           </section>
         </div>
       </div>

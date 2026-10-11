@@ -40,6 +40,23 @@ import {
 } from '../../shared/editor'
 import { NotFoundError } from '../errors'
 import type { RenderService } from '../editor/render-service'
+import {
+  AccountIdInputSchema,
+  AddManualAccountInputSchema,
+  ConnectYouTubeInputSchema,
+  CreatePublicationsInputSchema,
+  MarkPublishedInputSchema,
+  PublicationIdInputSchema,
+  PublicationListInputSchema,
+  UpdateAccountInputSchema,
+  YouTubeCredentialsInputSchema,
+  type Account,
+  type PlatformId
+} from '../../shared/publishing'
+import type { AccountsRepository } from '../repositories/accounts'
+import type { PublicationsRepository } from '../repositories/publications'
+import type { PublishService } from '../publishing/publish-service'
+import type { YouTubeClientConfig } from '../connectors/config'
 import type { PresetsRepository } from '../repositories/presets'
 import type { VersionsRepository } from '../repositories/versions'
 import type { Logger } from '../logger'
@@ -59,6 +76,7 @@ export type HandlerDeps = {
   rendererLogger: Logger
   getAppInfo: () => AppInfo
   openLogsFolder: () => Promise<void>
+  copyText?: (text: string) => void
   chooseDataDirectory: () => Promise<DirectoryChoiceResult>
   chooseExportDirectory: () => Promise<DirectoryChoiceResult>
   media: {
@@ -86,6 +104,17 @@ export type HandlerDeps = {
     encoder: () => Promise<EncoderInfo>
     showVersionInFolder: (path: string) => void
   }
+  publishing: {
+    accounts: AccountsRepository
+    publications: PublicationsRepository
+    service: PublishService
+    youtubeConfig: YouTubeClientConfig
+    connectYouTube: (projectIds: string[]) => Promise<Account>
+    disconnect: (id: string) => Promise<Account>
+    remove: (id: string) => void
+    /** Opens an https URL in the system browser. */
+    openExternal: (url: string) => Promise<void>
+  }
   onSettingsChanged?: () => void
 }
 
@@ -94,7 +123,10 @@ export type HandlerDeps = {
 export type HandlerTable = Record<IpcChannel, HandlerDefinition<any, any>>
 
 export function buildHandlers(deps: HandlerDeps): HandlerTable {
-  const { media, watch, editor } = deps
+  const { media, watch, editor, publishing } = deps
+  const assertProjects = (ids: readonly string[] | undefined) => {
+    for (const id of ids ?? []) assertProject(id)
+  }
   const assertProject = (projectId: string | null | undefined) => {
     if (projectId && !deps.projects.exists(projectId)) {
       throw new NotFoundError('Esse projeto não existe mais. Escolha outro.')
@@ -114,6 +146,14 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
       schema: EmptyInputSchema,
       handle: async () => {
         await deps.openLogsFolder()
+        return null
+      }
+    }),
+
+    [IpcChannels.appCopyText]: defineHandler({
+      schema: z.object({ text: z.string().max(20_000) }).strict(),
+      handle: ({ text }) => {
+        deps.copyText?.(text)
         return null
       }
     }),
@@ -375,6 +415,108 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
     [IpcChannels.editorEncoder]: defineHandler({
       schema: EmptyInputSchema,
       handle: () => editor.encoder()
+    }),
+
+    [IpcChannels.platformsList]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => publishing.service.platforms()
+    }),
+    [IpcChannels.platformsOpenUpload]: defineHandler({
+      schema: z.object({ platformId: z.enum(['youtube', 'tiktok', 'instagram']) }).strict(),
+      handle: async ({ platformId }) => {
+        const info = publishing.service.platforms().find((p) => p.id === (platformId as PlatformId))
+        if (!info?.uploadUrl) throw new NotFoundError('Essa plataforma não tem uma página de envio conhecida.')
+        await publishing.openExternal(info.uploadUrl)
+        return null
+      }
+    }),
+    [IpcChannels.youtubeCredentialsGet]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => ({ clientId: publishing.youtubeConfig.clientId() })
+    }),
+    [IpcChannels.youtubeCredentialsSet]: defineHandler({
+      schema: YouTubeCredentialsInputSchema,
+      handle: ({ clientId, clientSecret }) => {
+        publishing.youtubeConfig.set({ clientId, clientSecret })
+        deps.logger.info('YouTube client credentials saved', { clientId })
+        return null
+      }
+    }),
+    [IpcChannels.youtubeCredentialsClear]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => {
+        publishing.youtubeConfig.clear()
+        return null
+      }
+    }),
+    [IpcChannels.accountsList]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => publishing.accounts.list()
+    }),
+    [IpcChannels.accountsConnectYouTube]: defineHandler({
+      schema: ConnectYouTubeInputSchema,
+      handle: ({ projectIds }) => {
+        assertProjects(projectIds)
+        return publishing.connectYouTube(projectIds)
+      }
+    }),
+    [IpcChannels.accountsAddManual]: defineHandler({
+      schema: AddManualAccountInputSchema,
+      handle: ({ platformId, displayName, projectIds }) => {
+        assertProjects(projectIds)
+        return publishing.accounts.addManual({ platformId, displayName, projectIds })
+      }
+    }),
+    [IpcChannels.accountsUpdate]: defineHandler({
+      schema: UpdateAccountInputSchema,
+      handle: ({ id, ...patch }) => {
+        assertProjects(patch.projectIds)
+        return publishing.accounts.update(id, patch)
+      }
+    }),
+    [IpcChannels.accountsDisconnect]: defineHandler({
+      schema: AccountIdInputSchema,
+      handle: ({ id }) => publishing.disconnect(id)
+    }),
+    [IpcChannels.accountsRemove]: defineHandler({
+      schema: AccountIdInputSchema,
+      handle: ({ id }) => {
+        publishing.remove(id)
+        return null
+      }
+    }),
+    [IpcChannels.publicationsList]: defineHandler({
+      schema: PublicationListInputSchema,
+      handle: (filter) => publishing.publications.list(filter)
+    }),
+    [IpcChannels.publicationsCreate]: defineHandler({
+      schema: CreatePublicationsInputSchema,
+      handle: (input) => publishing.service.create(input)
+    }),
+    [IpcChannels.publicationsRetry]: defineHandler({
+      schema: PublicationIdInputSchema,
+      handle: ({ id }) => publishing.service.retry(id)
+    }),
+    [IpcChannels.publicationsCancel]: defineHandler({
+      schema: PublicationIdInputSchema,
+      handle: ({ id }) => publishing.service.cancel(id)
+    }),
+    [IpcChannels.publicationsMarkPublished]: defineHandler({
+      schema: MarkPublishedInputSchema,
+      handle: ({ id, url }) => publishing.service.markManualPublished(id, url)
+    }),
+    [IpcChannels.publicationsOpenUrl]: defineHandler({
+      schema: PublicationIdInputSchema,
+      handle: async ({ id }) => {
+        const url = publishing.publications.get(id).externalUrl
+        if (!url || !/^https:\/\//.test(url)) throw new NotFoundError('Essa publicação não tem um link.')
+        await publishing.openExternal(url)
+        return null
+      }
+    }),
+    [IpcChannels.publicationsNotes]: defineHandler({
+      schema: VersionIdInputSchema,
+      handle: ({ id }) => publishing.service.notes(id)
     }),
 
     [IpcChannels.settingsGet]: defineHandler({

@@ -33,6 +33,7 @@ type Props = {
   initialFilters: LibraryFilters
   versionCounts: Record<string, number>
   onOpenEditor: (contentId: string) => void
+  onOpenAccounts: () => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
 }
@@ -47,7 +48,7 @@ const SORTS: Record<SortKey, (a: ContentItem, b: ContentItem) => number> = {
   duration: (a, b) => (b.durationSeconds ?? -1) - (a.durationSeconds ?? -1)
 }
 
-export function LibraryScreen({ library, projects, initialFilters, versionCounts, onOpenEditor, onNotice, onError }: Props) {
+export function LibraryScreen({ library, projects, initialFilters, versionCounts, onOpenEditor, onOpenAccounts, onNotice, onError }: Props) {
   const { assets, queue, tools } = library
   const [query, setQuery] = useState('')
   const [project, setProject] = useState<ProjectFilter>(initialFilters.project)
@@ -383,6 +384,7 @@ export function LibraryScreen({ library, projects, initialFilters, versionCounts
           asset={selected}
           projects={projects}
           onOpenEditor={() => onOpenEditor(selected.id)}
+          onOpenAccounts={onOpenAccounts}
           onClose={() => setSelectedId(null)}
           onNotice={onNotice}
           onError={(e) => onNotice({ tone: 'error', text: errorMessage(e) })}

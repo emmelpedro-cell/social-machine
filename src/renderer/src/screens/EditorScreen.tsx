@@ -28,6 +28,7 @@ import { formatPrecise, TrimBar } from '../editor/TrimBar'
 import { useVersions } from '../editor/useVersions'
 import { VersionsList } from '../editor/VersionsList'
 import { assetState, displayName, thumbnailUrl } from '../media/format'
+import { PublishDialog } from '../publishing/PublishDialog'
 
 type Props = {
   content: ContentItem | null
@@ -36,6 +37,7 @@ type Props = {
   assets: ContentItem[] | null
   projects: Project[]
   onOpen: (contentId: string, settings?: EditSettings) => void
+  onOpenAccounts: () => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
 }
@@ -54,7 +56,7 @@ function nextVersionName(versions: ContentVersion[] | null): string {
   return `Versão ${(versions?.length ?? 0) + 1}`
 }
 
-export function EditorScreen({ content, initialSettings, assets, projects, onOpen, onNotice, onError }: Props) {
+export function EditorScreen({ content, initialSettings, assets, projects, onOpen, onOpenAccounts, onNotice, onError }: Props) {
   if (!content) return <EditorPicker assets={assets} projects={projects} onOpen={onOpen} />
   return (
     <Editor
@@ -63,6 +65,7 @@ export function EditorScreen({ content, initialSettings, assets, projects, onOpe
       initialSettings={initialSettings}
       projects={projects}
       onOpen={onOpen}
+      onOpenAccounts={onOpenAccounts}
       onNotice={onNotice}
       onError={onError}
     />
@@ -133,6 +136,7 @@ function Editor({
   initialSettings,
   projects,
   onOpen,
+  onOpenAccounts,
   onNotice,
   onError
 }: Omit<Props, 'content' | 'assets'> & { content: ContentItem }) {
@@ -150,6 +154,7 @@ function Editor({
   const [presetScope, setPresetScope] = useState<'project' | 'global'>(content.projectId ? 'project' : 'global')
   const [encoder, setEncoder] = useState<EncoderInfo | null>(null)
   const controls = useRef<PreviewControls | null>(null)
+  const [publishing, setPublishing] = useState<ContentVersion | null>(null)
   const { versions } = useVersions(content.id)
   const project = projects.find((p) => p.id === content.projectId) ?? null
 
@@ -495,6 +500,7 @@ function Editor({
             <VersionsList
               versions={versions}
               compact
+              onPublish={setPublishing}
               onEditCopy={(v) => {
                 setSettings({ ...v.settings, texts: v.settings.texts.map((t) => ({ ...t })) })
                 setSelectedTextId(null)
@@ -507,6 +513,16 @@ function Editor({
           </div>
         </aside>
       </div>
+      {publishing && (
+        <PublishDialog
+          version={publishing}
+          content={content}
+          project={project}
+          onClose={() => setPublishing(null)}
+          onOpenAccounts={onOpenAccounts}
+          onNotice={onNotice}
+        />
+      )}
     </div>
   )
 }

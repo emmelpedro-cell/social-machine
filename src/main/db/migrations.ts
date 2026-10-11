@@ -260,6 +260,16 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX idx_content_versions_status ON content_versions (status);
       CREATE INDEX idx_edit_presets_project ON edit_presets (project_id);
     `
+  },
+  {
+    version: 3,
+    name: 'publishing',
+    sql: `
+      -- Phase 3: manual destinations (TikTok/Instagram without API access) are accounts too.
+      ALTER TABLE accounts ADD COLUMN is_manual INTEGER NOT NULL DEFAULT 0 CHECK (is_manual IN (0, 1));
+      CREATE INDEX idx_publications_created ON publications (created_at DESC);
+      CREATE INDEX idx_publications_version ON publications (content_version_id);
+    `
   }
 ]
 

@@ -20,6 +20,13 @@ import { EncoderSelector, SOFTWARE_ENCODER } from '../../src/main/editor/encoder
 import { RenderService } from '../../src/main/editor/render-service'
 import { PresetsRepository } from '../../src/main/repositories/presets'
 import { VersionsRepository } from '../../src/main/repositories/versions'
+import { AccountsRepository } from '../../src/main/repositories/accounts'
+import { PublicationsRepository } from '../../src/main/repositories/publications'
+import { PublishService } from '../../src/main/publishing/publish-service'
+import { ManualConnector } from '../../src/main/connectors/manual'
+import { YouTubeConnector } from '../../src/main/connectors/youtube/connector'
+import { YouTubeClientConfig } from '../../src/main/connectors/config'
+import { MemorySecretStore } from '../../src/main/secrets/token-store'
 import { createNodeSqliteDriver, memoryLogger } from '../helpers/node-sqlite-driver'
 
 function setup() {
@@ -56,6 +63,29 @@ function setup() {
     logger,
     emit: () => {}
   })
+  const accounts = new AccountsRepository(db)
+  const publications = new PublicationsRepository(db)
+  const secrets = new MemorySecretStore()
+  const youtubeConfig = new YouTubeClientConfig(db, secrets)
+  const youtube = new YouTubeConnector({
+    accounts,
+    secrets,
+    config: youtubeConfig,
+    fetch: async () => {
+      throw new Error('no network in tests')
+    },
+    openBrowser: () => {},
+    logger
+  })
+  const publisher = new PublishService({
+    publications,
+    accounts,
+    versions,
+    connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
+    logger,
+    emit: () => {}
+  })
+  const opened: string[] = []
   const table = buildHandlers({
     projects: new ProjectsRepository(db),
     settings: new SettingsRepository(db, logger),
@@ -98,11 +128,28 @@ function setup() {
       renderer,
       encoder: async () => SOFTWARE_ENCODER,
       showVersionInFolder: () => {}
+    },
+    publishing: {
+      accounts,
+      publications,
+      service: publisher,
+      youtubeConfig,
+      connectYouTube: (projectIds) => youtube.connect(projectIds),
+      disconnect: async (id) => {
+        accounts.disconnect(id)
+        return accounts.get(id)
+      },
+      remove: (id) => {
+        accounts.remove(id)
+      },
+      openExternal: async (url) => {
+        opened.push(url)
+      }
     }
   })
   const call = <T>(channel: keyof HandlerTable, input?: unknown) =>
     wrapHandler(channel, table[channel], logger)(input) as Promise<IpcResult<T>>
-  return { call, logger, table, mediaRepo, watchRepo, watchService, events }
+  return { call, logger, table, mediaRepo, watchRepo, watchService, events, opened, secrets }
 }
 
 describe('IPC handlers', () => {
@@ -173,7 +220,14 @@ describe('IPC handlers', () => {
       [IpcChannels.versionsCreate, { contentId: 'nope', name: 'x', settings: {}, overlays: [] }],
       [IpcChannels.versionsRemove, { id: '00000000-0000-4000-8000-000000000000' }],
       [IpcChannels.presetsSave, { projectId: null, name: '', settings: {} }],
-      [IpcChannels.presetsList, {}]
+      [IpcChannels.presetsList, {}],
+      [IpcChannels.youtubeCredentialsSet, { clientId: 'not-a-google-id', clientSecret: '' }],
+      [IpcChannels.accountsAddManual, { platformId: 'myspace', displayName: 'x', projectIds: [] }],
+      [IpcChannels.accountsAddManual, { platformId: 'tiktok', displayName: '', projectIds: [] }],
+      [IpcChannels.platformsOpenUpload, { platformId: 'tiktok', url: 'https://evil.example' }],
+      [IpcChannels.publicationsCreate, { versionId: '00000000-0000-4000-8000-000000000000', destinations: [], requestId: '00000000-0000-4000-8000-000000000000' }],
+      [IpcChannels.publicationsCreate, { versionId: '00000000-0000-4000-8000-000000000000', destinations: [{ accountId: 'x', title: null, caption: null, hashtags: [], fields: {} }], requestId: '00000000-0000-4000-8000-000000000000' }],
+      [IpcChannels.publicationsMarkPublished, { id: '00000000-0000-4000-8000-000000000000', url: 'javascript:alert(1)' }]
     ]
     for (const [channel, input] of cases) {
       const result = await ctx.call(channel, input)
@@ -255,6 +309,25 @@ describe('IPC handlers', () => {
     expect(listed.ok && listed.data.map((p) => p.name)).toEqual(['Limpo'])
     expect(await ctx.call(IpcChannels.editorEncoder)).toMatchObject({ ok: true, data: { id: 'libopenh264' } })
     expect(await ctx.call(IpcChannels.versionsCounts)).toEqual({ ok: true, data: {} })
+  })
+
+  it('manages manual accounts and YouTube credentials, never returning the secret', async () => {
+    const platforms = await ctx.call<{ id: string; configured: boolean; capabilities: string[] }[]>(IpcChannels.platformsList)
+    expect(platforms.ok && platforms.data.map((p) => [p.id, p.configured, p.capabilities[0]])).toEqual([
+      ['youtube', false, 'publish'],
+      ['tiktok', true, 'manual'],
+      ['instagram', true, 'manual']
+    ])
+    expect(await ctx.call(IpcChannels.youtubeCredentialsSet, { clientId: '1-a.apps.googleusercontent.com', clientSecret: 'GOCSPX-x' })).toEqual({ ok: true, data: null })
+    const creds = await ctx.call(IpcChannels.youtubeCredentialsGet)
+    expect(creds).toEqual({ ok: true, data: { clientId: '1-a.apps.googleusercontent.com' } })
+    expect(JSON.stringify(creds)).not.toContain('GOCSPX')
+
+    const added = await ctx.call<{ id: string; manual: boolean }>(IpcChannels.accountsAddManual, { platformId: 'tiktok', displayName: '@cortes', projectIds: [] })
+    expect(added.ok && added.data.manual).toBe(true)
+    expect(await ctx.call(IpcChannels.platformsOpenUpload, { platformId: 'tiktok' })).toEqual({ ok: true, data: null })
+    expect(ctx.opened).toEqual(['https://www.tiktok.com/upload'])
+    if (added.ok) expect(await ctx.call(IpcChannels.accountsRemove, { id: added.data.id })).toEqual({ ok: true, data: null })
   })
 
   it('updates settings through the allowed keys only', async () => {

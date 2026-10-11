@@ -20,18 +20,25 @@ import type { NoticeState } from '../Notice'
 import { ProjectSelect } from '../ProjectSelect'
 import { useVersions } from '../../editor/useVersions'
 import { VersionsList } from '../../editor/VersionsList'
+import { PublishDialog } from '../../publishing/PublishDialog'
+import { PublicationsList } from '../../publishing/PublicationsList'
+import { usePublications } from '../../publishing/usePublishing'
+import type { ContentVersion } from '../../../../shared/editor'
 
 type Props = {
   asset: ContentItem
   projects: Project[]
   onOpenEditor: () => void
+  onOpenAccounts: () => void
   onClose: () => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
 }
 
-export function AssetDetail({ asset, projects, onOpenEditor, onClose, onNotice, onError }: Props) {
+export function AssetDetail({ asset, projects, onOpenEditor, onOpenAccounts, onClose, onNotice, onError }: Props) {
   const { versions } = useVersions(asset.id)
+  const { publications } = usePublications(asset.id)
+  const [publishing, setPublishing] = useState<ContentVersion | null>(null)
   const state = assetState(asset)
   const [confirmRemove, setConfirmRemove] = useState(false)
   const [mismatch, setMismatch] = useState<string | null>(null)
@@ -231,13 +238,28 @@ export function AssetDetail({ asset, projects, onOpenEditor, onClose, onNotice, 
         <Fact label="Origem" value={ORIGIN_LABELS[asset.origin]} />
         <Fact label="Local" value={<code className="path">{asset.sourcePath}</code>} />
         <Fact label="Importado" value={formatDateTime(asset.importedAt)} />
-        <Fact label="Publicações" value={<span className="muted">Disponível na Fase 3</span>} />
       </dl>
 
       <section className="detail-versions">
         <h3 className="small-heading">Versões</h3>
-        <VersionsList versions={versions} compact onNotice={onNotice} onError={onError} />
+        <VersionsList versions={versions} compact onPublish={setPublishing} onNotice={onNotice} onError={onError} />
       </section>
+
+      <section className="detail-versions" data-testid="detail-publications">
+        <h3 className="small-heading">Publicações</h3>
+        <PublicationsList publications={publications} onNotice={onNotice} onError={onError} />
+      </section>
+
+      {publishing && (
+        <PublishDialog
+          version={publishing}
+          content={asset}
+          project={projects.find((p) => p.id === asset.projectId) ?? null}
+          onClose={() => setPublishing(null)}
+          onOpenAccounts={onOpenAccounts}
+          onNotice={onNotice}
+        />
+      )}
 
       <div className="danger-zone">
         {confirmRemove ? (
