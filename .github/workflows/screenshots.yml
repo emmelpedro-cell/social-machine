@@ -4,6 +4,12 @@ name: Screenshots
 # and publishes the screenshots to the "screenshots" branch.
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'screens (one shot per screen) or journey (import → analytics, numbered steps)'
+        type: choice
+        options: [screens, journey]
+        default: screens
 
 permissions:
   contents: write
@@ -40,17 +46,20 @@ jobs:
         run: npx electron-vite build
 
       - name: Capture screenshots
-        run: npx playwright test --project=screenshots
+        run: npx playwright test --project=screenshots tests/screenshots/${{ inputs.suite || 'screens' }}.spec.ts
 
       - name: Publish to the screenshots branch
+        if: always()
         run: |
-          mkdir /tmp/shots && cp screenshots/*.png /tmp/shots/
+          mkdir /tmp/shots && cp screenshots/*.png /tmp/shots/ && (cp screenshots/*.json /tmp/shots/ 2>/dev/null || true)
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git checkout --orphan screenshots-tmp
           git rm -rf --cached . > /dev/null
           git clean -fdx -e node_modules > /dev/null || true
-          cp /tmp/shots/*.png .
-          git add *.png
+          cp /tmp/shots/* .
+          git add *.png $(ls *.json 2>/dev/null)
           git commit -m "Screenshots from ${GITHUB_SHA::7}"
-          git push --force origin HEAD:screenshots
+          BRANCH=screenshots
+          if [ "${{ inputs.suite }}" = "journey" ]; then BRANCH=screenshots-journey; fi
+          git push --force origin HEAD:$BRANCH
