@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { InboxService } from '../../src/main/inbox/inbox-service'
+import { InboxRepository } from '../../src/main/repositories/inbox'
 import { MetricsService } from '../../src/main/analytics/metrics-service'
 import { MetricsRepository } from '../../src/main/repositories/metrics'
 import { QueueSettingsRepository } from '../../src/main/repositories/queue-settings'
@@ -154,6 +156,14 @@ function setup() {
       metrics: new MetricsRepository(db),
       accounts,
       publications,
+      connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
+      logger,
+      emit: () => {},
+      tickMs: 0
+    }),
+    inbox: new InboxService({
+      inbox: new InboxRepository(db),
+      accounts,
       connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
       logger,
       emit: () => {},

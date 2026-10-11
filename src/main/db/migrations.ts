@@ -292,6 +292,26 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE accounts ADD COLUMN metrics_checked_at TEXT;
       ALTER TABLE accounts ADD COLUMN metrics_error TEXT;
     `
+  },
+  {
+    version: 5,
+    name: 'inbox',
+    sql: `
+      -- Phase 6: comment threads. thread_id groups a top-level comment with its replies.
+      ALTER TABLE inbox_items ADD COLUMN thread_id TEXT;
+      ALTER TABLE inbox_items ADD COLUMN external_video_id TEXT;
+      ALTER TABLE inbox_items ADD COLUMN author_url TEXT;
+      ALTER TABLE inbox_items ADD COLUMN like_count INTEGER;
+      ALTER TABLE inbox_items ADD COLUMN can_reply INTEGER NOT NULL DEFAULT 0 CHECK (can_reply IN (0, 1));
+      -- Written by the account itself (e.g. a reply sent from the app): never "unread".
+      ALTER TABLE inbox_items ADD COLUMN is_own INTEGER NOT NULL DEFAULT 0 CHECK (is_own IN (0, 1));
+      ALTER TABLE inbox_items ADD COLUMN updated_at TEXT;
+      CREATE INDEX idx_inbox_status ON inbox_items (read_status, response_status);
+      CREATE INDEX idx_inbox_thread ON inbox_items (account_id, thread_id);
+      CREATE INDEX idx_inbox_created ON inbox_items (external_created_at DESC);
+      ALTER TABLE accounts ADD COLUMN inbox_checked_at TEXT;
+      ALTER TABLE accounts ADD COLUMN inbox_error TEXT;
+    `
   }
 ]
 

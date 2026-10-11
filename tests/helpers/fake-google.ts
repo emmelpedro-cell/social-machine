@@ -3,6 +3,10 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import type { GoogleEndpoints } from '../../src/main/connectors/youtube/oauth'
 
+export type FakeComment = { id: string; text: string; author: string; authorChannelId: string; publishedAt: string; likes?: number }
+
+const latest = (t: { top: FakeComment; replies: FakeComment[] }) => [t.top, ...t.replies].map((c) => c.publishedAt).sort().at(-1)!
+
 type Session = { id: string; total: number; received: Buffer[]; bytes: number; metadata: unknown; done: string | null }
 
 /**
@@ -37,6 +41,14 @@ export class FakeGoogle {
   readonly videoAnalytics = new Map<string, { minutes: number; avgDuration: number; avgPercentage: number; shares: number; subscribers: number }>()
   channelStats: Record<string, string | boolean> = { subscriberCount: '1200', viewCount: '50000', videoCount: '12', hiddenSubscriberCount: false }
   analyticsDisabled = false
+  // Comments
+  /** Comment threads on the channel's videos, newest activity first is computed on read. */
+  readonly threads: { id: string; videoId: string; canReply: boolean; top: FakeComment; replies: FakeComment[] }[] = []
+  readonly insertedReplies: { parentId: string; text: string }[] = []
+  /** Scopes granted at consent; null = whatever the app asked for. */
+  grantScopes: string | null = null
+  private requestedScopes = ''
+  failNextReply = false
   readonly analyticsQueries: URLSearchParams[] = []
 
   async start(): Promise<void> {
@@ -61,6 +73,7 @@ export class FakeGoogle {
   approve = async (authUrl: string): Promise<void> => {
     const url = new URL(authUrl)
     this.challenge = url.searchParams.get('code_challenge')
+    this.requestedScopes = url.searchParams.get('scope') ?? ''
     const redirect = new URL(url.searchParams.get('redirect_uri')!)
     redirect.searchParams.set('code', 'auth-code-1')
     redirect.searchParams.set('state', url.searchParams.get('state')!)
@@ -130,7 +143,7 @@ export class FakeGoogle {
           this.json(res, 400, { error: 'invalid_grant', error_description: 'Bad code or PKCE verifier' })
           return
         }
-        this.json(res, 200, { access_token: this.newAccessToken(), refresh_token: 'refresh-1', expires_in: 3599, scope: 'youtube.upload' })
+        this.json(res, 200, { access_token: this.newAccessToken(), refresh_token: 'refresh-1', expires_in: 3599, scope: this.grantScopes ?? this.requestedScopes })
         return
       }
       if (params.get('grant_type') === 'refresh_token') {
@@ -154,6 +167,81 @@ export class FakeGoogle {
       const withStats = (url.searchParams.get('part') ?? '').includes('statistics')
       this.json(res, 200, {
         items: this.channel ? [{ id: this.channel.id, snippet: { title: this.channel.title }, ...(withStats ? { statistics: this.channelStats } : {}) }] : []
+      })
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/youtube/v3/commentThreads') {
+      if (!this.authorized(req, res)) return
+      const sorted = [...this.threads].sort((a, b) => latest(b).localeCompare(latest(a)))
+      const start = Number(url.searchParams.get('pageToken') ?? 0)
+      const size = Number(url.searchParams.get('maxResults') ?? 20)
+      const page = sorted.slice(start, start + size)
+      const resource = (c: FakeComment, videoId: string, parentId?: string) => ({
+        id: c.id,
+        snippet: {
+          videoId,
+          textOriginal: c.text,
+          textDisplay: c.text,
+          authorDisplayName: c.author,
+          authorChannelUrl: `https://www.youtube.com/channel/${c.authorChannelId}`,
+          authorChannelId: { value: c.authorChannelId },
+          publishedAt: c.publishedAt,
+          updatedAt: c.publishedAt,
+          likeCount: c.likes ?? 0,
+          ...(parentId ? { parentId } : {})
+        }
+      })
+      this.json(res, 200, {
+        items: page.map((t) => ({
+          id: t.id,
+          snippet: { videoId: t.videoId, canReply: t.canReply, totalReplyCount: t.replies.length, topLevelComment: resource(t.top, t.videoId) },
+          ...(t.replies.length ? { replies: { comments: t.replies.map((r) => resource(r, t.videoId, t.id)) } } : {})
+        })),
+        ...(start + size < sorted.length ? { nextPageToken: String(start + size) } : {})
+      })
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/youtube/v3/comments') {
+      if (!this.authorized(req, res)) return
+      const granted = (this.grantScopes ?? this.requestedScopes).split(' ')
+      if (!granted.includes('https://www.googleapis.com/auth/youtube.force-ssl')) {
+        this.json(res, 403, { error: { code: 403, message: 'Request had insufficient authentication scopes.', status: 'PERMISSION_DENIED', errors: [{ reason: 'insufficientPermissions' }] } })
+        return
+      }
+      const body = JSON.parse((await this.body(req)).toString()) as { snippet: { parentId: string; textOriginal: string } }
+      if (this.failNextReply) {
+        this.failNextReply = false
+        this.json(res, 400, { error: { code: 400, message: 'bad', errors: [{ reason: 'commentTextTooLong' }] } })
+        return
+      }
+      const thread = this.threads.find((t) => t.id === body.snippet.parentId)
+      if (!thread) {
+        this.json(res, 404, { error: { code: 404, message: 'Parent not found', errors: [{ reason: 'parentCommentNotFound' }] } })
+        return
+      }
+      this.insertedReplies.push({ parentId: body.snippet.parentId, text: body.snippet.textOriginal })
+      const reply: FakeComment = {
+        id: `${thread.id}.r${thread.replies.length + 1}`,
+        text: body.snippet.textOriginal,
+        author: this.channel?.title ?? 'Canal',
+        authorChannelId: this.channel?.id ?? 'UC123',
+        publishedAt: new Date().toISOString()
+      }
+      thread.replies.push(reply)
+      this.json(res, 200, {
+        id: reply.id,
+        snippet: {
+          videoId: thread.videoId,
+          parentId: thread.id,
+          textOriginal: reply.text,
+          authorDisplayName: reply.author,
+          authorChannelId: { value: reply.authorChannelId },
+          publishedAt: reply.publishedAt,
+          updatedAt: reply.publishedAt,
+          likeCount: 0
+        }
       })
       return
     }

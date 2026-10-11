@@ -115,6 +115,19 @@ Em **Analytics**:
 - A página de cada conteúdo compara todos os destinos lado a lado, com visualizações em 24 h, 7 e 30 dias e um gráfico da evolução.
 - Nada é estimado: o que falta aparece como "indisponível". Engajamento = (curtidas + comentários + compartilhamentos) ÷ visualizações.
 
+### Inbox
+
+Em **Inbox** ficam os comentários dos seus vídeos do YouTube, sincronizados a cada 15 minutos ou na hora, com **Sincronizar**.
+
+- Filtros: não lidos, abertos, todos ou resolvidos, além de projeto, plataforma, conta, conteúdo e busca por texto ou autor.
+- Clique num comentário para ver a conversa. Abrir marca como lido.
+- Use **Marcar como resolvido**, **Abrir no YouTube** ou **Abrir conteúdo**, que leva à página de desempenho.
+- **Responder:** você escreve e clica em **Enviar resposta**. A resposta sai pública, pelo seu canal. Nada é respondido automaticamente.
+  - Se a conta foi conectada antes desta versão, reconecte em **Contas** para autorizar as respostas. O Google vai pedir a permissão de "gerenciar sua conta do YouTube".
+  - Cada resposta gasta 50 unidades da cota diária da API (10.000 por padrão).
+- **TikTok e Instagram:** as APIs de comentários exigem app aprovado pela plataforma, então a Inbox mostra isso e os comentários continuam no app deles.
+- Na primeira sincronização, comentários com mais de 7 dias entram como já lidos.
+
 ### Pasta da Drop Machine
 
 Em **Configurações → Pastas monitoradas**, use **Adicionar pasta da Drop Machine…** e escolha a pasta de saída (normalmente `C:\drop-machine\public\output`). Escolha também o projeto que os vídeos novos devem receber.

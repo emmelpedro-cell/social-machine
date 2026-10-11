@@ -8,12 +8,25 @@ import {
   ReauthorizeError,
   type CollectedMetrics,
   type Connector,
+  type ExternalComment,
+  type InboxCapabilities,
   type MetricsRequest,
   type PublishableVersion,
   type PublishContext,
   type PublishResult
 } from '../types'
-import { getChannelStats, getMyChannel, getVideoAnalytics, getVideoStats, uploadVideo, YouTubeApiError, type VideoAnalytics } from './api'
+import {
+  getChannelStats,
+  getMyChannel,
+  getVideoAnalytics,
+  getVideoStats,
+  insertReply,
+  listCommentThreads,
+  uploadVideo,
+  YouTubeApiError,
+  type CommentResource,
+  type VideoAnalytics
+} from './api'
 import type { MetricValues } from '../../../shared/analytics'
 import {
   authorizeWithLoopback,
@@ -21,6 +34,7 @@ import {
   OAuthError,
   refreshTokens,
   revokeTokens,
+  YOUTUBE_REPLY_SCOPE,
   YOUTUBE_SCOPES,
   type Fetch,
   type GoogleEndpoints,
@@ -60,7 +74,7 @@ export class YouTubeConnector implements Connector {
     return {
       id: 'youtube',
       name: 'YouTube',
-      capabilities: ['publish', 'metrics'],
+      capabilities: ['publish', 'metrics', 'comments'],
       note:
         'Envio pela API oficial do YouTube (OAuth). Requer um OAuth Client ID do tipo "App para computador" criado por você no Google Cloud. ' +
         'Com o projeto do Google em modo "Teste", o login expira a cada 7 dias e a conta precisa ser reconectada.',
@@ -194,30 +208,83 @@ export class YouTubeConnector implements Connector {
     }
   }
 
+  /** Runs an API call with a valid token; on 401 refreshes once, then asks to reconnect. */
+  private async withToken<T>(account: AccountRecord, fn: (token: string) => Promise<T>): Promise<T> {
+    try {
+      return await fn(await this.accessToken(account))
+    } catch (error) {
+      if (!(error instanceof YouTubeApiError && error.unauthorized)) throw error
+      try {
+        return await fn(await this.accessToken(account, true))
+      } catch (again) {
+        if (again instanceof YouTubeApiError && again.unauthorized) {
+          this.options.accounts.setStatus(account.id, 'expired', again.message)
+          throw new ReauthorizeError(again.message)
+        }
+        throw again
+      }
+    }
+  }
+
+  private grantedScopes(account: AccountRecord): string[] {
+    const tokens = account.tokenRef ? this.options.secrets.load<StoredTokens>(account.tokenRef) : null
+    return (tokens?.scope ?? '').split(/\s+/).filter(Boolean)
+  }
+
+  inboxCapabilities(account: AccountRecord): InboxCapabilities {
+    if (account.connectionStatus !== 'connected') {
+      return { readComments: false, reply: false, limitation: 'Conta desconectada: reconecte em Contas para ver os comentários.' }
+    }
+    const scopes = this.grantedScopes(account)
+    // Tokens saved before scopes were recorded have an empty list: let the API decide.
+    const reply = scopes.length === 0 || scopes.includes(YOUTUBE_REPLY_SCOPE)
+    return {
+      readComments: true,
+      reply,
+      limitation: reply ? null : 'Para responder pelo app, reconecte a conta em Contas e autorize “gerenciar sua conta do YouTube”.'
+    }
+  }
+
+  /** Comment threads on the channel's videos (top-level comments and the replies YouTube includes), newest first. */
+  async fetchComments(account: AccountRecord, options: { knownUntil: string | null; maxPages: number }): Promise<ExternalComment[]> {
+    const channelId = account.externalAccountId
+    if (!channelId) throw new ReauthorizeError('Canal desconhecido. Conecte a conta de novo.')
+    const out: ExternalComment[] = []
+    let pageToken: string | null = null
+    for (let page = 0; page < options.maxPages; page++) {
+      const result = await this.withToken(account, (t) => listCommentThreads(this.options.fetch, t, channelId, pageToken, this.endpoints))
+      let reachedKnown = false
+      for (const thread of result.threads) {
+        const top = thread.snippet?.topLevelComment
+        if (!top) continue
+        const canReply = thread.snippet?.canReply !== false
+        out.push(toExternal(top, thread.id, 'comment', thread.snippet?.videoId ?? null, channelId, canReply))
+        for (const reply of thread.replies?.comments ?? []) out.push(toExternal(reply, thread.id, 'reply', thread.snippet?.videoId ?? null, channelId, canReply))
+        // Threads come ordered by latest activity; once a whole thread is older than what we have, stop.
+        const latest = [top, ...(thread.replies?.comments ?? [])].map((c) => c.snippet?.updatedAt ?? c.snippet?.publishedAt ?? '').sort().at(-1) ?? ''
+        if (options.knownUntil && latest && latest < options.knownUntil) reachedKnown = true
+      }
+      pageToken = result.nextPageToken
+      if (!pageToken || reachedKnown) break
+    }
+    if (account.connectionStatus !== 'connected') this.options.accounts.setStatus(account.id, 'connected')
+    return out
+  }
+
+  async replyToComment(account: AccountRecord, threadId: string, text: string): Promise<ExternalComment> {
+    const caps = this.inboxCapabilities(account)
+    if (!caps.reply) throw new ReauthorizeError(caps.limitation ?? 'Reconecte a conta para responder.')
+    const created = await this.withToken(account, (t) => insertReply(this.options.fetch, t, threadId, text, this.endpoints))
+    return toExternal(created, threadId, 'reply', created.snippet?.videoId ?? null, account.externalAccountId ?? '', true, true)
+  }
+
   /**
    * Counters from the Data API (fresh) plus watch time, shares and subscribers
    * gained from the YouTube Analytics API (lagging a day or more). If Analytics
    * fails, the counters are still saved and the reason is returned as a warning.
    */
   async collectMetrics(account: AccountRecord, items: readonly MetricsRequest[]): Promise<CollectedMetrics> {
-    const call = async <T>(fn: (token: string) => Promise<T>): Promise<T> => {
-      try {
-        return await fn(await this.accessToken(account))
-      } catch (error) {
-        if (error instanceof YouTubeApiError && error.unauthorized) {
-          try {
-            return await fn(await this.accessToken(account, true))
-          } catch (again) {
-            if (again instanceof YouTubeApiError && again.unauthorized) {
-              this.options.accounts.setStatus(account.id, 'expired', again.message)
-              throw new ReauthorizeError(again.message)
-            }
-            throw again
-          }
-        }
-        throw error
-      }
-    }
+    const call = <T>(fn: (token: string) => Promise<T>) => this.withToken(account, fn)
     const ids = [...new Set(items.map((i) => i.externalPostId))]
     const stats = ids.length ? await call((t) => getVideoStats(this.options.fetch, t, ids, this.endpoints)) : new Map()
     let warning: string | null = null
@@ -259,5 +326,31 @@ export class YouTubeConnector implements Connector {
     }
     if (account.connectionStatus !== 'connected') this.options.accounts.setStatus(account.id, 'connected')
     return { publications, account: channel, warning }
+  }
+}
+
+function toExternal(
+  c: CommentResource,
+  threadId: string,
+  type: 'comment' | 'reply',
+  videoId: string | null,
+  channelId: string,
+  canReply: boolean,
+  own = false
+): ExternalComment {
+  const s = c.snippet ?? {}
+  return {
+    externalId: c.id,
+    threadId,
+    type,
+    videoId: s.videoId ?? videoId,
+    text: s.textOriginal ?? s.textDisplay ?? '',
+    author: s.authorDisplayName ?? null,
+    authorUrl: s.authorChannelUrl ?? null,
+    own: own || (Boolean(channelId) && s.authorChannelId?.value === channelId),
+    createdAt: s.publishedAt ?? new Date().toISOString(),
+    updatedAt: s.updatedAt ?? null,
+    likeCount: typeof s.likeCount === 'number' ? s.likeCount : null,
+    canReply
   }
 }

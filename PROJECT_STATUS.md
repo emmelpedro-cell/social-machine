@@ -1,8 +1,36 @@
 # Project status
 
-_Last updated: 2026-10-11 — Phase 5_
+_Last updated: 2026-10-11 — Phase 6_
 
-## Current phase: 5 — Analytics
+## Current phase: 6 — Inbox
+
+Acceptance criterion (spec §17): _the user follows the available interactions in one central interface._
+
+| Item | Status |
+| --- | --- |
+| API rules checked against official docs (commentThreads.list 1 unit, comments.insert 50 units + `youtube.force-ssl`, canReply, commentsDisabled) | Done (TD-124, TD-125) |
+| YouTube comments and replies on the channel's videos, linked to the app's publications | Done |
+| Sync every 15 min and on demand; stops at known comments; per-account status and errors | Done |
+| Desktop notification for new comments (not for the first backlog) | Done |
+| Filters: status, project, platform, account, content, search | Done (TD-126) |
+| Mark read/unread, resolve/reopen, mark all as read | Done |
+| Replies written by the user, sent once; thread history including own replies | Done (TD-125) |
+| Open the comment on the platform; open the related content | Done |
+| Capabilities per account (comments, replies, notifications) with the reason when unavailable | Done |
+| Schema v5 | Done |
+
+### Verification (Phase 6)
+
+_Pending CI run._
+
+### Known limitations (Phase 6)
+
+- TikTok and Instagram comments aren't available (no approved apps); their accounts say so.
+- YouTube includes only some replies per thread in the list; the full conversation opens on YouTube.
+- Accounts connected before Phase 6 must reconnect to reply (new permission).
+- No AI suggestions yet (Phase 7, always as suggestions for you to review).
+
+## Phase 5 — Analytics (accepted)
 
 Acceptance criterion (spec §17): _the user can compare the performance of publications on the connected networks._
 

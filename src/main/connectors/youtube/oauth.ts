@@ -30,8 +30,16 @@ export const GOOGLE_ENDPOINTS: GoogleEndpoints = {
   analytics: 'https://youtubeanalytics.googleapis.com/v2'
 }
 
-/** Upload videos; read the channel, video statistics and YouTube Analytics reports (which accept `youtube.readonly`). */
-export const YOUTUBE_SCOPES = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly']
+/**
+ * Upload videos; read the channel, video statistics and YouTube Analytics reports (which accept `youtube.readonly`);
+ * read comment threads and reply to comments (`comments.insert` requires `youtube.force-ssl`).
+ */
+export const YOUTUBE_SCOPES = [
+  'https://www.googleapis.com/auth/youtube.upload',
+  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/youtube.force-ssl'
+]
+export const YOUTUBE_REPLY_SCOPE = 'https://www.googleapis.com/auth/youtube.force-ssl'
 
 export type OAuthClient = { clientId: string; clientSecret: string }
 
@@ -223,7 +231,9 @@ export async function refreshTokens(options: {
   }
   if (options.client.clientSecret) params['client_secret'] = options.client.clientSecret
   const body = await tokenRequest(options.fetch, (options.endpoints ?? GOOGLE_ENDPOINTS).token, params)
-  return toTokens(body, options.tokens.refreshToken, (options.now ?? Date.now)())
+  const fresh = toTokens(body, options.tokens.refreshToken, (options.now ?? Date.now)())
+  // Google may omit `scope` on refresh; the grant's scopes haven't changed then.
+  return fresh.scope ? fresh : { ...fresh, scope: options.tokens.scope }
 }
 
 /** Best effort: tells Google to drop the grant. Local data is deleted regardless. */

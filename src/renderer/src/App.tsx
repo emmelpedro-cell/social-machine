@@ -12,13 +12,14 @@ import { DashboardScreen } from './screens/DashboardScreen'
 import { LibraryScreen, type LibraryFilters } from './screens/LibraryScreen'
 import { ProjectsScreen } from './screens/ProjectsScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
-import { PhasePlaceholder, PLACEHOLDERS, type PlaceholderId } from './screens/PhasePlaceholder'
 import { EditorScreen } from './screens/EditorScreen'
 import { AccountsScreen } from './screens/AccountsScreen'
 import { QueueScreen } from './screens/QueueScreen'
 import { AnalyticsScreen } from './screens/AnalyticsScreen'
 import { CalendarScreen } from './screens/CalendarScreen'
 import { useAttentionCount } from './queue/useAttention'
+import { InboxScreen } from './screens/InboxScreen'
+import { useInboxUnread } from './inbox/useInbox'
 import { useVersionCounts } from './editor/useVersions'
 import type { EditSettings } from '../../shared/editor'
 
@@ -49,6 +50,7 @@ export function App() {
   const watch = useWatchFolders()
   const versionCounts = useVersionCounts()
   const attention = useAttentionCount()
+  const inboxUnread = useInboxUnread()
   const [analyticsContent, setAnalyticsContent] = useState<{ id: string | null; key: number }>({ id: null, key: 0 })
 
   function openAnalytics(contentId: string | null) {
@@ -143,6 +145,7 @@ export function App() {
         version={info?.version}
         needsReview={needsReview}
         attention={attention}
+        inboxUnread={inboxUnread}
       />
       <main className="main" aria-live="polite">
         {screen === 'dashboard' && (
@@ -221,8 +224,14 @@ export function App() {
           />
         )}
         {screen === 'accounts' && <AccountsScreen projects={projectList} onNotice={setNotice} onError={showError} />}
-        {(Object.keys(PLACEHOLDERS) as PlaceholderId[]).includes(screen as PlaceholderId) && (
-          <PhasePlaceholder {...PLACEHOLDERS[screen as PlaceholderId]} />
+        {screen === 'inbox' && (
+          <InboxScreen
+            projects={projectList}
+            onOpenContent={(id) => openAnalytics(id)}
+            onOpenAccounts={() => setScreen('accounts')}
+            onNotice={setNotice}
+            onError={showError}
+          />
         )}
         {screen === 'settings' && settings && info && (
           <SettingsScreen

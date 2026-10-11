@@ -32,7 +32,13 @@ const REASON_MESSAGES: Record<string, string> = {
     'A YouTube Analytics API não está ativada no seu projeto do Google Cloud. Ative-a (APIs e serviços → Biblioteca → YouTube Analytics API) para ver tempo assistido, compartilhamentos e inscritos ganhos.',
   SERVICE_DISABLED:
     'A YouTube Analytics API não está ativada no seu projeto do Google Cloud. Ative-a (APIs e serviços → Biblioteca → YouTube Analytics API) para ver tempo assistido, compartilhamentos e inscritos ganhos.',
-  insufficientPermissions: 'O login do YouTube não tem permissão para ler estatísticas. Reconecte a conta em Contas.',
+  insufficientPermissions: 'O login do YouTube não tem essa permissão. Reconecte a conta em Contas para concedê-la.',
+  ACCESS_TOKEN_SCOPE_INSUFFICIENT: 'O login do YouTube não tem essa permissão. Reconecte a conta em Contas para concedê-la.',
+  commentsDisabled: 'Os comentários estão desativados nesse vídeo.',
+  commentTextTooLong: 'A resposta é longa demais para o YouTube.',
+  parentCommentIsPrivate: 'Não é possível responder a um comentário privado.',
+  operationNotSupported: 'O YouTube não permite responder a esse comentário.',
+  processingFailure: 'O YouTube não conseguiu processar a resposta. Tente de novo.',
   rateLimitExceeded: 'Muitos pedidos ao YouTube em pouco tempo. Tentando de novo em instantes.',
   userRateLimitExceeded: 'Muitos pedidos ao YouTube em pouco tempo. Tentando de novo em instantes.'
 }
@@ -402,3 +408,70 @@ export async function getVideoAnalytics(
   }
   return out
 }
+
+/* ------------------------------------------------------------------ */
+/* Comments                                                           */
+/* ------------------------------------------------------------------ */
+
+type CommentResource = {
+  id: string
+  snippet?: {
+    videoId?: string
+    textOriginal?: string
+    textDisplay?: string
+    authorDisplayName?: string
+    authorChannelUrl?: string
+    authorChannelId?: { value?: string }
+    publishedAt?: string
+    updatedAt?: string
+    likeCount?: number
+    parentId?: string
+  }
+}
+
+export type CommentThreadResource = {
+  id: string
+  snippet?: { videoId?: string; canReply?: boolean; totalReplyCount?: number; topLevelComment?: CommentResource }
+  replies?: { comments?: CommentResource[] }
+}
+
+/** One page of comment threads on the channel's videos, newest first (commentThreads.list, 1 unit). */
+export async function listCommentThreads(
+  fetch: Fetch,
+  accessToken: string,
+  channelId: string,
+  pageToken: string | null,
+  endpoints: GoogleEndpoints = GOOGLE_ENDPOINTS
+): Promise<{ threads: CommentThreadResource[]; nextPageToken: string | null }> {
+  const params = new URLSearchParams({
+    part: 'snippet,replies',
+    allThreadsRelatedToChannelId: channelId,
+    order: 'time',
+    maxResults: '100',
+    textFormat: 'plainText'
+  })
+  if (pageToken) params.set('pageToken', pageToken)
+  const response = await fetch(`${endpoints.api}/commentThreads?${params.toString()}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!response.ok) throw await apiError(response, 'Não foi possível ler os comentários')
+  const body = (await response.json()) as { items?: CommentThreadResource[]; nextPageToken?: string }
+  return { threads: body.items ?? [], nextPageToken: body.nextPageToken ?? null }
+}
+
+/** Replies to a top-level comment (comments.insert, 50 units; needs youtube.force-ssl). */
+export async function insertReply(
+  fetch: Fetch,
+  accessToken: string,
+  parentId: string,
+  text: string,
+  endpoints: GoogleEndpoints = GOOGLE_ENDPOINTS
+): Promise<CommentResource> {
+  const response = await fetch(`${endpoints.api}/comments?part=snippet`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ snippet: { parentId, textOriginal: text } })
+  })
+  if (!response.ok) throw await apiError(response, 'O YouTube recusou a resposta')
+  return (await response.json()) as CommentResource
+}
+
+export type { CommentResource }

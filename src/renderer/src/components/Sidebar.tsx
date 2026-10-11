@@ -19,21 +19,21 @@ type Props = {
   needsReview: number
   /** Publications waiting for the user (manual, failed, missed, paused). */
   attention: number
+  /** Unread comments in the Inbox. */
+  inboxUnread: number
 }
 
-export function Sidebar({ current, onNavigate, version, needsReview, attention }: Props) {
+export function Sidebar({ current, onNavigate, version, needsReview, attention, inboxUnread }: Props) {
   const main: Item[] = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'library', label: 'Biblioteca', badge: needsReview },
     { id: 'editor', label: 'Editor' },
     { id: 'queue', label: 'Fila', badge: attention },
     { id: 'calendar', label: 'Calendário' },
+    { id: 'inbox', label: 'Inbox', badge: inboxUnread },
     { id: 'analytics', label: 'Analytics' },
     { id: 'projects', label: 'Projetos' },
     { id: 'accounts', label: 'Contas' }
-  ]
-  const later: Item[] = [
-    { id: 'inbox', label: 'Inbox', phase: 6 }
   ]
 
   const renderItem = (item: Item) => (
@@ -51,7 +51,7 @@ export function Sidebar({ current, onNavigate, version, needsReview, attention }
           </span>
         )}
         {!item.phase && item.badge ? (
-          <span className="nav-badge" title={item.id === 'queue' ? `${item.badge} precisam de você` : `${item.badge} para revisar`} data-testid={`nav-badge-${item.id}`}>
+          <span className="nav-badge" title={item.id === 'queue' ? `${item.badge} precisam de você` : item.id === 'inbox' ? `${item.badge} não lidos` : `${item.badge} para revisar`} data-testid={`nav-badge-${item.id}`}>
             {item.badge}
           </span>
         ) : null}
@@ -75,8 +75,6 @@ export function Sidebar({ current, onNavigate, version, needsReview, attention }
       </div>
 
       <ul className="nav">{main.map(renderItem)}</ul>
-      <p className="nav-section">Próximas fases</p>
-      <ul className="nav">{later.map(renderItem)}</ul>
 
       <div className="sidebar-footer">
         <button
@@ -87,7 +85,7 @@ export function Sidebar({ current, onNavigate, version, needsReview, attention }
         >
           Configurações
         </button>
-        <p className="build-tag">Fase 5 · analytics{version ? ` · v${version}` : ''}</p>
+        <p className="build-tag">Fase 6 · inbox{version ? ` · v${version}` : ''}</p>
       </div>
     </nav>
   )

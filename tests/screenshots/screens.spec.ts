@@ -244,6 +244,20 @@ test('screenshots', async () => {
   await expect(page.getByTestId('performance-table')).toBeVisible()
   await shot(page, '11-desempenho')
 
+  // Inbox: comments on the channel.
+  const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString()
+  google.threads.push(
+    { id: 'c1', videoId, canReply: true, top: { id: 'c1', text: 'Que golaço! Quem é o jogador?', author: 'Ana Ribeiro', authorChannelId: 'UCa', publishedAt: ago(95) }, replies: [{ id: 'c1.r1', text: 'Também quero saber 👀', author: 'Pedro', authorChannelId: 'UCp', publishedAt: ago(60) }] },
+    { id: 'c2', videoId, canReply: true, top: { id: 'c2', text: 'Esse lance foi absurdo!', author: 'Bruno Lima', authorChannelId: 'UCb', publishedAt: ago(42) }, replies: [] },
+    { id: 'c3', videoId, canReply: true, top: { id: 'c3', text: 'Posta mais cortes do campeonato, por favor', author: 'Carla', authorChannelId: 'UCc', publishedAt: ago(12) }, replies: [] }
+  )
+  await navigate(page, 'Inbox')
+  await page.getByTestId('inbox-sync').click()
+  await expect(page.getByTestId('inbox-item')).toHaveCount(4)
+  await page.getByTestId('inbox-item').filter({ hasText: 'Quem é o jogador' }).click()
+  await page.getByTestId('reply-text').fill('É o atacante do time da casa, aos 44 do segundo tempo!')
+  await shot(page, '12-inbox')
+
   // Library with details open.
   await openLibrary(page)
   await page.getByTestId('filter-project').selectOption('all')

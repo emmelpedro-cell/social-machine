@@ -40,6 +40,8 @@ import { PublicationsRepository } from './repositories/publications'
 import { QueueSettingsRepository } from './repositories/queue-settings'
 import { MetricsRepository } from './repositories/metrics'
 import { MetricsService } from './analytics/metrics-service'
+import { InboxService } from './inbox/inbox-service'
+import { InboxRepository } from './repositories/inbox'
 import { FileSecretStore } from './secrets/token-store'
 
 const APP_NAME = 'Social Machine'
@@ -65,6 +67,7 @@ let watchService: WatchService | null = null
 let renderService: RenderService | null = null
 let publishService: PublishService | null = null
 let analyticsService: MetricsService | null = null
+let inboxService: InboxService | null = null
 let settingsRepo: SettingsRepository | null = null
 let quitting = false
 let trayHintShown = false
@@ -211,12 +214,7 @@ function start(): void {
     connectors,
     logger: log.child('publish'),
     emit: sendPublicationEvent,
-    notify: (title, body) => {
-      if (!Notification.isSupported()) return
-      const notification = new Notification({ title, body })
-      notification.on('click', () => showWindow())
-      notification.show()
-    }
+    notify: desktopNotify
   })
   publishService = publisher
   const metricsService = new MetricsService({
@@ -230,6 +228,17 @@ function start(): void {
     }
   })
   analyticsService = metricsService
+  const inbox = new InboxService({
+    inbox: new InboxRepository(opened.db),
+    accounts,
+    connectors,
+    logger: log.child('inbox'),
+    emit: () => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IpcEvents.inbox, { type: 'inbox' })
+    },
+    notify: desktopNotify
+  })
+  inboxService = inbox
 
   protocol.handle(MEDIA_SCHEME, (request) =>
     handleMediaRequest(request, { repo: contents, thumbnailsDirectory: layout.thumbnails, versions })
@@ -375,6 +384,7 @@ function start(): void {
       }
     },
     analytics: metricsService,
+    inbox,
     onSettingsChanged: () => applyOsSettings()
   })
 
@@ -396,6 +406,7 @@ function start(): void {
   void renderer.start().catch((error) => log.error('Render recovery failed', { error }))
   publisher.start()
   metricsService.start()
+  inbox.start()
   // Reconciliation: files created while the app was closed are found here.
   void watcher.start().catch((error) => log.error('Folder watching failed to start', { error }))
 
@@ -514,6 +525,14 @@ function sendPublicationEvent(event: PublicationEvent): void {
  * Google endpoints. Development and test builds may point them at a local
  * stand-in (SM_GOOGLE_ENDPOINTS, JSON); packaged builds always use Google.
  */
+/** A Windows notification; clicking it brings the app forward. */
+function desktopNotify(title: string, body: string): void {
+  if (!Notification.isSupported()) return
+  const notification = new Notification({ title, body })
+  notification.on('click', () => showWindow())
+  notification.show()
+}
+
 function googleEndpoints(): GoogleEndpoints {
   const override = process.env['SM_GOOGLE_ENDPOINTS']
   if (!override || app.isPackaged) return GOOGLE_ENDPOINTS
@@ -647,6 +666,7 @@ app.on('will-quit', () => {
     // Interrupted uploads continue from their saved session on the next start.
     publishService?.shutdown()
     analyticsService?.shutdown()
+    inboxService?.shutdown()
     // Stop FFmpeg child processes; unfinished imports resume on the next start.
     importService?.shutdown()
     tray?.destroy()

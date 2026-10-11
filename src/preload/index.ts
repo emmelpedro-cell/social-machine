@@ -167,6 +167,22 @@ const api: SmApi = {
       }
     }
   },
+  inbox: {
+    list: () => call(IpcChannels.inboxList),
+    status: () => call(IpcChannels.inboxStatus),
+    sync: (accountId) => call(IpcChannels.inboxSync, accountId ? { accountId } : {}),
+    setRead: (ids, read) => call(IpcChannels.inboxSetRead, { ids, value: read }),
+    setResolved: (ids, resolved) => call(IpcChannels.inboxSetResolved, { ids, value: resolved }),
+    reply: (id, text) => call(IpcChannels.inboxReply, { id, text }),
+    open: (id) => call(IpcChannels.inboxOpen, { id }),
+    onEvent: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IpcEvents.inbox, handler)
+      return () => {
+        ipcRenderer.removeListener(IpcEvents.inbox, handler)
+      }
+    }
+  },
   settings: {
     get: () => call(IpcChannels.settingsGet),
     update: (input) => call(IpcChannels.settingsUpdate, input),

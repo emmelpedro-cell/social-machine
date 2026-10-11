@@ -57,7 +57,7 @@ test('the renderer has no access to Node or ipcRenderer', async () => {
   expect(exposure).toEqual({
     require: 'undefined',
     process: 'undefined',
-    api: ['accounts', 'analytics', 'app', 'editor', 'log', 'media', 'platforms', 'presets', 'projects', 'publications', 'queue', 'settings', 'versions', 'watch', 'youtube']
+    api: ['accounts', 'analytics', 'app', 'editor', 'inbox', 'log', 'media', 'platforms', 'presets', 'projects', 'publications', 'queue', 'settings', 'versions', 'watch', 'youtube']
   })
   await app.close()
 })
@@ -76,14 +76,17 @@ test('the media protocol only serves library contents', async () => {
   await app.close()
 })
 
-test('later-phase areas say what is coming instead of showing fake controls', async () => {
+test('every area opens with real content (no placeholders left)', async () => {
   const { app, page } = await launchApp(dataDir)
   for (const [label, heading] of [
-    ['Inbox', 'Inbox']
+    ['Fila', 'Fila'],
+    ['Calendário', 'Calendário'],
+    ['Inbox', 'Inbox'],
+    ['Analytics', 'Analytics']
   ] as const) {
     await navigate(page, label)
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
-    await expect(page.getByText(/Chega na Fase \d/).first()).toBeVisible()
+    await expect(page.getByText(/Chega na Fase \d/)).toHaveCount(0)
   }
   await app.close()
 })

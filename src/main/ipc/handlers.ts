@@ -63,6 +63,8 @@ import type { PublicationsRepository } from '../repositories/publications'
 import type { PublishService } from '../publishing/publish-service'
 import type { QueueSettingsRepository } from '../repositories/queue-settings'
 import type { MetricsService } from '../analytics/metrics-service'
+import type { InboxService } from '../inbox/inbox-service'
+import { InboxIdsInputSchema, InboxItemIdInputSchema, InboxReplyInputSchema, InboxSyncInputSchema } from '../../shared/inbox'
 import {
   ContentAnalyticsInputSchema,
   ManualMetricsInputSchema,
@@ -131,6 +133,7 @@ export type HandlerDeps = {
     openExternal: (url: string) => Promise<void>
   }
   analytics: MetricsService
+  inbox: InboxService
   onSettingsChanged?: () => void
 }
 
@@ -596,6 +599,46 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
       schema: SnapshotIdInputSchema,
       handle: ({ id }) => {
         deps.analytics.deleteManual(id)
+        return null
+      }
+    }),
+
+    [IpcChannels.inboxList]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => deps.inbox.list()
+    }),
+    [IpcChannels.inboxStatus]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => deps.inbox.status()
+    }),
+    [IpcChannels.inboxSync]: defineHandler({
+      schema: InboxSyncInputSchema,
+      handle: ({ accountId }) => deps.inbox.sync(accountId)
+    }),
+    [IpcChannels.inboxSetRead]: defineHandler({
+      schema: InboxIdsInputSchema,
+      handle: ({ ids, value }) => {
+        deps.inbox.setRead(ids, value)
+        return null
+      }
+    }),
+    [IpcChannels.inboxSetResolved]: defineHandler({
+      schema: InboxIdsInputSchema,
+      handle: ({ ids, value }) => {
+        deps.inbox.setResolved(ids, value)
+        return null
+      }
+    }),
+    [IpcChannels.inboxReply]: defineHandler({
+      schema: InboxReplyInputSchema,
+      handle: ({ id, text }) => deps.inbox.reply(id, text)
+    }),
+    [IpcChannels.inboxOpen]: defineHandler({
+      schema: InboxItemIdInputSchema,
+      handle: async ({ id }) => {
+        const url = deps.inbox.get(id).url
+        if (!url || !/^https:\/\/www\.youtube\.com\//.test(url)) throw new NotFoundError('Esse comentário não tem um link.')
+        await publishing.openExternal(url)
         return null
       }
     }),

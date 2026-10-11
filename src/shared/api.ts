@@ -30,6 +30,7 @@ import type {
   QueueItem,
   QueueSettings
 } from './publishing'
+import type { InboxAccountStatus, InboxItem, InboxSyncResult } from './inbox'
 import type { AnalyticsOverview, ContentAnalytics, ManualMetricsInput, MetricSnapshot, RefreshResult } from './analytics'
 import type {
   AddWatchFolderResult,
@@ -183,6 +184,19 @@ export interface SmApi {
     /** Numbers read in the platform's app, for manual destinations. */
     addManual(input: ManualMetricsInput): Promise<IpcResult<MetricSnapshot>>
     deleteManual(id: string): Promise<IpcResult<null>>
+    onEvent(listener: () => void): () => void
+  }
+  inbox: {
+    list(): Promise<IpcResult<InboxItem[]>>
+    /** Per account: what the inbox can do there, last sync and errors. */
+    status(): Promise<IpcResult<InboxAccountStatus[]>>
+    sync(accountId?: string): Promise<IpcResult<InboxSyncResult>>
+    setRead(ids: string[], read: boolean): Promise<IpcResult<null>>
+    setResolved(ids: string[], resolved: boolean): Promise<IpcResult<null>>
+    /** Sends a reply the user wrote. */
+    reply(id: string, text: string): Promise<IpcResult<InboxItem>>
+    /** Opens the comment on the platform in the browser. */
+    open(id: string): Promise<IpcResult<null>>
     onEvent(listener: () => void): () => void
   }
   settings: {

@@ -79,6 +79,13 @@ export const IpcChannels = {
   analyticsRefresh: 'analytics:refresh',
   analyticsAddManual: 'analytics:add-manual',
   analyticsDeleteManual: 'analytics:delete-manual',
+  inboxList: 'inbox:list',
+  inboxStatus: 'inbox:status',
+  inboxSync: 'inbox:sync',
+  inboxSetRead: 'inbox:set-read',
+  inboxSetResolved: 'inbox:set-resolved',
+  inboxReply: 'inbox:reply',
+  inboxOpen: 'inbox:open',
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
   settingsChooseDataDirectory: 'settings:choose-data-directory',
@@ -96,5 +103,6 @@ export const IpcEvents = {
   watch: 'watch:event',
   versions: 'versions:event',
   publishing: 'publishing:event',
-  analytics: 'analytics:event'
+  analytics: 'analytics:event',
+  inbox: 'inbox:event'
 } as const

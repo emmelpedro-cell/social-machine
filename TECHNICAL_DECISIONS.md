@@ -139,6 +139,20 @@ TD-001 to TD-020 come from the Music Content Engine, whose Phase 1 code is the b
 **Decision:** totals sum only known values and report how many publications had each value ("1 de 2 com dado"); averages divide by publications with data. Engagement = (likes + comments + shares) ÷ views, only when all four exist and views > 0; group engagement is weighted (total interactions ÷ total views of those publications). Comparisons by platform, project, account, format (aspect ratio of the published version) and duration bucket are computed in the renderer from the same rows with one shared pure function, so every chart and table agrees. The UI notes that platforms count views differently.
 **Why:** spec §11: no invented numbers, a clearly defined engagement formula, and no comparison of incompatible definitions without explanation.
 
+### TD-124 — Inbox from YouTube comment threads; other platforms marked unavailable
+
+**Decision:** the Inbox reads `commentThreads.list` with `allThreadsRelatedToChannelId` (part `snippet,replies`, newest first, 100 per page, 1 quota unit per page) every 15 minutes and on demand, stopping at the first page that reaches comments already stored (at most 5 pages per sync). Each comment and reply is stored once (`UNIQUE(account, external id)`), linked to the app's publication when the video was published from the app; edits update text and likes but keep read/resolved/replied status. On an account's first sync, comments older than 7 days are stored as read (history), and no desktop notification is shown; later syncs notify about new comments. YouTube returns only some replies per thread, so the UI links to the full conversation. TikTok and Instagram comments need approved apps (TD-114): their accounts show that, and nothing is scraped. General notifications (likes, new followers) are not offered by these APIs to this app and are shown as unavailable.
+**Why:** spec §10 asks for the comments and interactions the APIs authorize, with clear indication of what isn't available.
+
+### TD-125 — Replies: written by the user, sent once, with an explicit scope
+
+**Decision:** replies use `comments.insert` with `snippet.parentId` = the thread's top-level comment (50 quota units), which requires the `youtube.force-ssl` scope; the app now requests it at connection. Accounts connected before this show "reconecte para responder" (granted scopes are kept from the token response, including across refreshes). The service refuses a second send for the same comment while one is in flight; the sent reply is stored as the account's own message (never unread) and the comment becomes "Respondido". Nothing is answered automatically and no AI text is sent.
+**Why:** spec §10 and §16: answer only where the API allows it; AI only as suggestions for human review (Phase 7).
+
+### TD-126 — Inbox states
+
+**Decision:** read status (unread/read) and response status (none/resolved/replied) are separate. Opening a comment marks it read; it can be marked unread again. "Abertos" = not resolved and not replied. Filters: status, project, platform, account, content and text search; the sidebar shows the unread count.
+
 ## Inherited decisions (Music Content Engine)
 
 ## TD-001 — electron-vite as the build tool
