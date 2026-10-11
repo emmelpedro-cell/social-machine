@@ -29,8 +29,13 @@ function clip(name: string, source: string, size: string) {
   ])
 }
 
-async function shot(page: Page, name: string) {
-  await page.waitForTimeout(600)
+async function shot(page: Page, name: string, options: { top?: boolean } = {}) {
+  // Notices fade out on their own; close them so they don't cover the screen.
+  for (const close of await page.locator('.notice-close').all()) await close.click().catch(() => undefined)
+  if (options.top !== false) {
+    await page.evaluate(() => document.querySelectorAll('.main, .library-main, .asset-detail').forEach((el) => el.scrollTo(0, 0)))
+  }
+  await page.waitForTimeout(700)
   await page.screenshot({ path: join(out, `${name}.png`) })
 }
 
@@ -61,6 +66,12 @@ test.afterAll(async () => {
 test('screenshots', async () => {
   const { app, page } = await launchApp(dataDir, { env: { SM_GOOGLE_ENDPOINTS: JSON.stringify(google.endpoints) } })
   await stubBrowser(app)
+  // A typical laptop window (the workflow raises the runner's screen resolution first).
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0]!
+    win.setContentSize(1440, 900)
+    win.center()
+  })
 
   // Projects.
   await navigate(page, 'Projetos')
@@ -148,7 +159,8 @@ test('screenshots', async () => {
   await dialog.getByTestId('publish-caption').fill('Que golaço! ⚽')
   await dialog.getByTestId('publish-hashtags').fill('#futebol #gol #golaço')
   await dialog.getByTestId('kids-no').check()
-  await shot(page, '07-publicar')
+  await dialog.evaluate((el) => el.scrollTo(0, 0))
+  await shot(page, '07-publicar', { top: false })
   await dialog.getByTestId('publish-submit').click()
   await expect(page.getByTestId('detail-publications').locator('[data-testid="publication-item"][data-account="MMA Cortes"]')).toHaveAttribute(
     'data-status',

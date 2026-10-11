@@ -968,7 +968,7 @@ select:focus {
   height: 100%;
 }
 .library.has-detail {
-  grid-template-columns: 1fr minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
 }
 
 .library-main {
@@ -981,6 +981,14 @@ select:focus {
 }
 .library-header {
   margin-bottom: 0;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.library-header .row {
+  flex-wrap: wrap;
+}
+.asset-detail .path {
+  word-break: break-all;
 }
 
 .toolbar {
