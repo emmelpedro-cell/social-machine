@@ -85,7 +85,7 @@ export function Sidebar({ current, onNavigate, version, needsReview, attention, 
         >
           Configurações
         </button>
-        <p className="build-tag">Fase 6 · inbox{version ? ` · v${version}` : ''}</p>
+        <p className="build-tag">Fase 7 · tendências{version ? ` · v${version}` : ''}</p>
       </div>
     </nav>
   )

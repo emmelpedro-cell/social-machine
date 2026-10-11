@@ -18,7 +18,12 @@ Acceptance criterion (spec §17): _the app helps the user understand what works 
 
 ### Verification (Phase 7, data part)
 
-_Pending CI run._
+**Verified on Windows** (GitHub Actions `windows-latest`, run 38158603714, 2026-10-11): install, type check, unit tests, Electron E2E, installer build and packaged-app test all passed.
+
+- **Unit tests: 216 passed, 1 skipped.** New: trends need enough posts per group (hint ≥ 3, trend ≥ 8) and a ≥ 25% gap; a viral outlier doesn't flip a median; comparisons never mix platforms or projects; platform comparison carries the caveat; experiments for too little data and for platforms not tried; contents worth a new version; period comparison; 24 h / 7 d marks only from readings close to the mark and only once reached; the derived "Publicado" state.
+- **Electron E2E: 17 passed.** The analytics test now also checks the "Tendências e ideias" tab with fresh posts (no conclusions, experiments suggested), the "Publicado" badge and filter in the library and the dashboard tile.
+- **CI fix:** `scripts/ci-step.sh` returned success even when the wrapped command failed (the exit status read after `if … fi` is the block's), so the type-check, install, FFmpeg and installer steps could not fail the job since Phase 1. Fixed and verified; the type check then showed a single error (a test helper missing new fields), fixed in the same run.
+- Journey screenshots (Screenshots run 38158887822, suite "journey"): 21 steps from a Drop Machine clip to analytics, trends and the inbox; no renderer errors, no errors or warnings in the app log.
 
 ## Phase 6 — Inbox (accepted)
 
