@@ -1,8 +1,46 @@
 # Project status
 
-_Last updated: 2026-10-11 — Phase 1_
+_Last updated: 2026-10-11 — Phase 2_
 
-## Current phase: 1 — Base funcional
+## Current phase: 2 — Editor
+
+Acceptance criterion (spec §17): _the user can prepare and export videos without opening another editor._
+
+| Item | Status |
+| --- | --- |
+| Editor screen (from the library or the menu), live preview at the exact output framing | Done |
+| Output formats 9:16 (1080×1920), 16:9, 1:1, 4:5, original; cover/contain, zoom, position by sliders or dragging, blurred/black background | Done |
+| Trim start/end (draggable bar, "here" buttons), looping preview, mute | Done |
+| Text overlays: bundled and Windows fonts, size, bold, uppercase, color, outline, shadow, background box, alignment, width, time range, drag to position | Done |
+| Same drawing code for preview and export (canvas → PNG → FFmpeg) (TD-108) | Done |
+| Platform safe-area guides for TikTok/Reels/Shorts (approximate) | Done |
+| Versions: background render queue, progress, cancel, retry, recovery after quit, `.part` output verified by FFprobe, thumbnail, never overwriting files, original never modified (TD-110) | Done |
+| H.264 encoder detection with hardware → OpenH264 fallback; setting to force OpenH264 (TD-109) | Done |
+| Versions listed in the editor and the library details panel; play, show in folder, edit as new, delete with/without file; count on library cards | Done |
+| Presets per project or global (format, framing, text styles) | Done |
+| Schema v2 (rendering columns), migration with backup | Done |
+
+### Verification (Phase 2)
+
+**Verified on Windows** (GitHub Actions `windows-latest`, run 38100271259, 2026-10-11): install, type check, unit tests, Electron E2E, installer build and packaged-app test all passed.
+
+- **Unit tests: 163 passed, 1 skipped** (symlink test, non-Windows only). New for Phase 2:
+  - layout math and render plan (cover/contain, position edges, zoom, even sizes, trim, timed overlays in order, audio/mute, fps cap, bitrate), progress parsing, Windows-safe names, PNG validation;
+  - real FFmpeg renders: 9:16 with trim and a text overlay (pixel-checked in the output), contain on black with muted audio, original format, 16:9 with blurred background; impossible requests rejected (trim past the end, wrong overlay size, orphan overlay, duplicate name); existing export files never overwritten; cancel; interrupted render marked failed and retried; delete with/without file; missing original refused; encoder detection; presets.
+- **Electron E2E: 12 passed**, including through the real UI: a clip opened in the editor, zoomed, given a text in Anton with a background box, exported as "Clean 9:16"; the MP4 on disk is 1080×1920 with the box burned in where the preview drew it; the original is byte-identical; the content moved to "Em edição"; a preset saved; the version plays in the app; after a restart the library card shows "1 versão", and a second version from the preset in 1:1 renders at 1080×1080.
+- **Packaged app: 2 passed.**
+
+**Manual checks still useful on a real PC:** the hardware encoder chosen on your machine (Settings shows it) and the look of exported text against real footage on a phone.
+
+### Known limitations (Phase 2)
+
+- Text is static during its time range: no animation or word-by-word highlight yet (future work in the spec).
+- No automatic captions/transcription, batch editing or auto-reframing yet (future work).
+- The blurred background in the preview is a CSS approximation of the export's blur; framing, text and timing are exact.
+- Platform safe areas are approximate guides and may change with the apps.
+- Duration/format limits of each platform are not enforced yet; they will be checked against current official rules in Phase 3.
+
+## Phase 1 — Base funcional (accepted)
 
 Acceptance criterion (spec §17): _new clips from the Drop Machine appear in the Social Machine library._ Plus the Phase 1 completion criteria agreed for this repository: the app starts on Windows; projects persist; manual import works; new videos in the watched folder are detected, including those created while the app was closed; the same file is never imported twice (including after a rename); source files are never modified, moved or deleted; access errors, incomplete files and read failures are handled; tests and run instructions exist; the UI uses real data.
 
@@ -59,10 +97,8 @@ Acceptance criterion (spec §17): _new clips from the Drop Machine appear in the
 
 ## Next task
 
-**Phase 2 — Editor** (after Phase 1 is accepted on Windows):
+**Phase 3 — Accounts and publishing**, starting with one platform:
 
-- Decide the H.264 export encoder (TD-012 / open decisions) by measuring OpenH264 vs. hardware encoders on 1080×1920.
-- Trim start/end, crop/reframe to 9:16 with zoom and position, text overlays (font, size, color, outline, shadow, position) with per-project presets and platform safe-area preview.
-- Export with FFmpeg into `content_versions`, never overwriting the original.
-
-Before Phase 3, verify the current YouTube, TikTok and Instagram API requirements against the official documentation.
+- Verify current YouTube Data API (quota, audit, upload status), TikTok Content Posting API (audit; unaudited clients may only post privately) and Instagram Graph API requirements against the official documentation.
+- Token storage decision (Electron `safeStorage` vs. Windows Credential Manager).
+- OAuth connection, accounts list and project association, publication fields (title, caption, hashtags from the project), upload of a ready version, per-destination status and history, error handling.
