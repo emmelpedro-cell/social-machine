@@ -98,6 +98,27 @@ TD-001 to TD-020 come from the Music Content Engine, whose Phase 1 code is the b
 
 **Decision:** a publish action creates one `publications` row per destination, each with its own status (queued → publishing → published | failed | cancelled; manual_pending → published). All destinations are validated before any is created. The renderer generates a request id when the dialog opens; the idempotency key is `<request id>:<account id>` (UNIQUE), so a repeated call creates nothing twice. Publishing the same version to the same account again requires an explicit confirmation. Uploads run in the background, at most one per account and two in total; failures don't affect other destinations; failed uploads can be retried (continuing the saved session when possible).
 
+### TD-116 — In-process scheduler with a grace window; missed schedules wait for the user
+
+**Decision:** scheduled publications are rows with status `scheduled` and `scheduled_at`. The publish service runs a tick on start and every 20 s: due rows move atomically (`UPDATE … WHERE status = 'scheduled'`) to `queued` (API) or `manual_pending` (manual, with a desktop notification). A row more than 15 minutes late (the computer was off or the app closed) is not run: it is flagged `missed`, the user is notified once, and it appears under "Precisa de você" to publish now or reschedule. A time in the past (or within 30 s) when creating means "now".
+**Alternatives:** a Windows scheduled task or service that wakes the computer (rejected in Phase 1: needs elevation and a second process holding tokens); publishing missed posts as soon as the app opens (could post at 3 a.m. or after the moment passed — surprising and against "no silent automation").
+**Why:** the app already runs in the tray at login, so an in-process timer covers the normal case with no extra moving parts; the conditional update makes double runs impossible even if two ticks overlap; and the user always decides about anything that would go out at an unexpected time.
+
+### TD-117 — YouTube native scheduling (publishAt) by default
+
+**Decision:** for YouTube, a schedule defaults to "platform" mode: the video is uploaded right away as `private` with `status.publishAt`, and YouTube makes it public at that time even with the computer off. The publication stays `scheduled` with its video id and becomes `published` when its time passes. "Local" mode (upload at the time) is available. A platform-scheduled post can't be rescheduled, paused or cancelled from the app (that would need `videos.update`/`delete`, not in the upload scope); the UI says to use YouTube Studio.
+**Why:** per the API reference, `publishAt` requires `privacyStatus: private`, and a past time publishes immediately — the connector only sends it when the time is more than a minute ahead. Native scheduling is the reliable path; it also uses the upload quota at scheduling time, so quota problems show up early.
+
+### TD-118 — Posting preferences and free-slot suggestions
+
+**Decision:** `queue_settings` holds preferred weekdays and times per account (default: every day at 12:00 and 19:00, local time). "Próximo horário livre" picks the earliest preferred slot free on every chosen account (no planned post within 30 minutes). Suggestions only; nothing is auto-scheduled and nothing claims better reach.
+**Why:** spec §9 asks for preferred days/times per account without inventing performance claims; real best-time insights need Phase 5 data.
+
+### TD-119 — Calendar drag-and-drop keeps the time of day
+
+**Decision:** dragging a post to another day in the month/week calendar reschedules it to the same time on that day, through the same `reschedule` path (validation: future time, not already on the platform). Pause stores status `draft` with `fields.paused`; resume needs a future time.
+**Why:** the common action is "move to another day"; the time is edited precisely with "Reagendar". One code path for every reschedule keeps the rules in one place.
+
 ## Inherited decisions (Music Content Engine)
 
 ## TD-001 — electron-vite as the build tool
@@ -223,5 +244,4 @@ Additionally, every call checks `event.senderFrame.url` against the app's own pa
 - **Export quality check** (Phase 2 follow-up): compare OpenH264 at 10 Mbit/s with the hardware encoders on real footage; raise the software bitrate if needed (TD-109).
 - **TikTok/Instagram API publishing**: if an approved app becomes available, implement their connectors (TD-114).
 - **System proxy**: Node's fetch ignores the Windows proxy settings; switch to Electron's network stack if users behind proxies need it.
-- **Scheduler** (Phase 4): in-process timer with the `tasks` table vs. a helper process; how missed schedules are handled after the computer was off.
 - **Shared core with the MCE** (TD-101): when both apps are stable.

@@ -1,8 +1,34 @@
 # Project status
 
-_Last updated: 2026-10-11 — Phase 3_
+_Last updated: 2026-10-11 — Phase 4_
 
-## Current phase: 3 — Accounts and publishing
+## Current phase: 4 — Queue and calendar
+
+Acceptance criterion (spec §17): _the user can schedule and manage publications across projects._
+
+| Item | Status |
+| --- | --- |
+| Schedule per publication from the publish dialog (now / date-time / next free slot) | Done |
+| Local scheduler (tick on start and every 20 s), atomic transitions, 15-minute grace; missed schedules flagged and never published late silently | Done (TD-116) |
+| YouTube native scheduling with `publishAt` (uploaded right away as private), local mode available | Done (TD-117) |
+| Manual destinations: desktop notification at the time | Done |
+| Reschedule, publish now, pause/resume, cancel | Done |
+| Posting days and times per account, next-free-slot suggestion | Done (TD-118) |
+| Queue screen: needs you / sending / scheduled by day / recently published, filters by project and account | Done |
+| Calendar: month, week, day; project colors; drag to another day to reschedule | Done (TD-119) |
+| Dashboard "Próximas publicações"; sidebar badge for items waiting for you | Done |
+
+### Verification (Phase 4)
+
+_Pending CI run._
+
+### Known limitations (Phase 4)
+
+- Local schedules need the app running (tray is enough); the computer isn't woken up. YouTube's native scheduling doesn't have this limit.
+- A video already scheduled on YouTube is changed only in YouTube Studio (the upload scope doesn't allow editing it).
+- Best posting times are your preferences, not analytics (real data comes in Phase 5).
+
+## Phase 3 — Accounts and publishing (accepted)
 
 Acceptance criterion (spec §17): _the user can publish contents through official integrations._
 
@@ -36,7 +62,6 @@ Acceptance criterion (spec §17): _the user can publish contents through officia
 - TikTok and Instagram are manual until an approved app exists (TD-114).
 - With the Google project in "Testing", the YouTube login expires every 7 days (Google's rule).
 - Node's fetch doesn't use the Windows proxy settings.
-- Publishing is immediate; scheduling, per-account queues and the calendar are Phase 4.
 
 ## Phase 2 — Editor (accepted)
 

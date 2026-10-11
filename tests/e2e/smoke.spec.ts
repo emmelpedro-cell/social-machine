@@ -57,7 +57,7 @@ test('the renderer has no access to Node or ipcRenderer', async () => {
   expect(exposure).toEqual({
     require: 'undefined',
     process: 'undefined',
-    api: ['accounts', 'app', 'editor', 'log', 'media', 'platforms', 'presets', 'projects', 'publications', 'settings', 'versions', 'watch', 'youtube']
+    api: ['accounts', 'app', 'editor', 'log', 'media', 'platforms', 'presets', 'projects', 'publications', 'queue', 'settings', 'versions', 'watch', 'youtube']
   })
   await app.close()
 })

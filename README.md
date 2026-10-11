@@ -91,6 +91,18 @@ Para publicar: numa versão pronta (no editor ou no painel do vídeo na Bibliote
 - Nas manuais: **Abrir TikTok**, **Mostrar arquivo**, **Copiar legenda** e **Já publiquei** (com o link, se quiser).
 - Publicar a mesma versão de novo na mesma conta pede confirmação.
 
+### Fila e calendário
+
+No diálogo **Publicar…**, em **Quando**, escolha **Agora** ou **Agendar** (data e hora, ou **Próximo horário livre**).
+
+- **YouTube:** por padrão o agendamento é feito no próprio YouTube. O vídeo sobe na hora como privado e fica público sozinho no horário, mesmo com o computador desligado. Depois disso, mudanças só pelo YouTube Studio. Também dá para escolher "Enviar no horário".
+- **Outros agendamentos** rodam no app: ele precisa estar aberto no horário (pode ficar na bandeja). Para TikTok e Instagram chega um aviso do Windows na hora de publicar.
+- Se o computador estava desligado, nada sai atrasado sem você: a publicação aparece em **Precisa de você** para **Publicar agora** ou **Reagendar**. Até 15 minutos de atraso, ela sai normalmente.
+
+Em **Fila**: o que precisa de você, o que está enviando, as agendadas por dia e as publicadas recentemente. Cada uma tem **Publicar agora**, **Reagendar**, **Pausar**/**Retomar** e **Cancelar**. Na lateral, **Horários de postagem** define dias e horários preferidos de cada conta (usados no "Próximo horário livre").
+
+Em **Calendário**: visão de mês, semana e dia, com filtro por projeto e conta. A cor da borda é o projeto. Arraste uma publicação para outro dia para reagendar (mantém o horário).
+
 ### Pasta da Drop Machine
 
 Em **Configurações → Pastas monitoradas**, use **Adicionar pasta da Drop Machine…** e escolha a pasta de saída (normalmente `C:\drop-machine\public\output`). Escolha também o projeto que os vídeos novos devem receber.
