@@ -153,6 +153,16 @@ TD-001 to TD-020 come from the Music Content Engine, whose Phase 1 code is the b
 
 **Decision:** read status (unread/read) and response status (none/resolved/replied) are separate. Opening a comment marks it read; it can be marked unread again. "Abertos" = not resolved and not replied. Filters: status, project, platform, account, content and text search; the sidebar shows the unread count.
 
+### TD-127 — "Publicado" is derived, not stored
+
+**Decision:** contents carry `publishedCount` / `lastPublishedAt` computed from their publications. The library, dashboard and project counts show "Publicado" for a content with at least one publication out (unless archived), instead of its editorial state; the editorial state itself is unchanged. The library has a "Publicado" filter and the dashboard a "Publicados" tile. Publishing pushes an update of the content to the renderer.
+**Alternatives:** a new `published` value in `workflow_status` — rejected: SQLite can't alter the CHECK constraint without rebuilding `contents`, and rebuilding a table referenced with ON DELETE CASCADE inside the migration transaction would risk deleting versions and publications. A derived state also can't drift from the publications.
+
+### TD-128 — Trends and ideas without AI
+
+**Decision:** a pure function (`shared/insights.ts`) builds trends from the user's history: views 7 days after publishing (the last reading within 2 days before the mark, so new and old posts are measured at the same age), compared within one project and one platform, by median, for duration, time of day, weekday, on-screen text and format; platforms are compared within a project with an explicit caveat. "Indício" needs ≥ 3 posts per group, "Tendência" ≥ 8, and the best group must beat the next by ≥ 25%; every finding shows the counts and says it isn't proof of cause. Too little data produces experiment suggestions (one change at a time) instead of conclusions; projects never posted on a platform get a suggestion to try it; the top quarter of a project's posts are listed as worth a new version. Also: last 30 days vs the 30 before.
+**Why:** spec §12 — trends and hypotheses with the amount of data used, no causal claims. AI assistance (replies, captions) is deferred by the user's choice.
+
 ## Inherited decisions (Music Content Engine)
 
 ## TD-001 — electron-vite as the build tool

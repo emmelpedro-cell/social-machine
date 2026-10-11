@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { WORKFLOW_LABELS, type ContentItem } from '../../../../shared/media'
+import { EDITORIAL_LABELS, editorialState, type ContentItem } from '../../../../shared/media'
 import type { Project } from '../../../../shared/schemas'
 import { assetState, displayName, metaLine, STATE_LABEL, thumbnailUrl } from '../../media/format'
 
@@ -26,6 +26,7 @@ export function AssetCard({ asset, project, selected, checked, versionCount, onS
       data-file-name={asset.fileName}
       data-state={state}
       data-workflow={asset.workflowStatus}
+      data-editorial={editorialState(asset)}
     >
       <label className="asset-check" title="Selecionar">
         <input
@@ -55,8 +56,12 @@ export function AssetCard({ asset, project, selected, checked, versionCount, onS
             </span>
           )}
           {state === 'ready' && (
-            <span className={`workflow-badge wf-${asset.workflowStatus}`} data-testid="asset-workflow">
-              {WORKFLOW_LABELS[asset.workflowStatus]}
+            <span
+              className={`workflow-badge wf-${editorialState(asset)}`}
+              data-testid="asset-workflow"
+              title={asset.publishedCount > 0 ? `${asset.publishedCount} publicação(ões) no ar` : undefined}
+            >
+              {EDITORIAL_LABELS[editorialState(asset)]}
             </span>
           )}
         </span>

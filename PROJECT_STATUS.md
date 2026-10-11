@@ -1,8 +1,26 @@
 # Project status
 
-_Last updated: 2026-10-11 — Phase 6_
+_Last updated: 2026-10-11 — Phase 7 (data part)_
 
-## Current phase: 6 — Inbox
+## Current phase: 7 — Intelligence (data part; AI deferred)
+
+Acceptance criterion (spec §17): _the app helps the user understand what works and plan new content._
+
+| Item | Status |
+| --- | --- |
+| Historical comparisons: last 30 days vs previous 30 (posts, median 7-day views, engagement) | Done |
+| Trends by duration, time of day, weekday, on-screen text, format (within project × platform) and platform (within project), with evidence level and counts | Done (TD-128) |
+| Experiment suggestions (too little data, confirming hints, platforms not tried) | Done |
+| Recommendations per project; contents worth a new version | Done |
+| Content shown as "Publicado" in library/dashboard/projects | Done (TD-127) |
+| AI assistance for replies and captions | Deferred (user's choice) |
+| Feeding learnings back to the Drop Machine | Future (spec) |
+
+### Verification (Phase 7, data part)
+
+_Pending CI run._
+
+## Phase 6 — Inbox (accepted)
 
 Acceptance criterion (spec §17): _the user follows the available interactions in one central interface._
 

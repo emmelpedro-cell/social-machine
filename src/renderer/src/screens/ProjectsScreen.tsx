@@ -1,3 +1,4 @@
+import { editorialState } from '../../../shared/media'
 import { useMemo, useState } from 'react'
 import type { ContentItem } from '../../../shared/media'
 import type { Project } from '../../../shared/schemas'
@@ -37,8 +38,9 @@ export function ProjectsScreen({
       if (!a.projectId) continue
       const c = map.get(a.projectId) ?? { total: 0, review: 0, ready: 0 }
       c.total++
-      if (a.workflowStatus === 'needs_review') c.review++
-      if (a.workflowStatus === 'ready') c.ready++
+      const e = editorialState(a)
+      if (e === 'needs_review') c.review++
+      if (e === 'ready') c.ready++
       map.set(a.projectId, c)
     }
     return map

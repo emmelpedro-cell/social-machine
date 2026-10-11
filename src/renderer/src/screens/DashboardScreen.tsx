@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { WORKFLOW_LABELS, type ContentItem, type WorkflowStatus } from '../../../shared/media'
+import { EDITORIAL_LABELS, editorialState, WORKFLOW_LABELS, type ContentItem, type EditorialState } from '../../../shared/media'
 import type { Project } from '../../../shared/schemas'
 import type { WatchFolderStatus } from '../../../shared/watch'
 import { WATCH_STATE_LABEL } from '../components/WatchFoldersPanel'
@@ -38,11 +38,11 @@ export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibr
     [queue]
   )
   const stats = useMemo(() => {
-    const byWorkflow: Record<WorkflowStatus, number> = { imported: 0, needs_review: 0, editing: 0, ready: 0, archived: 0 }
+    const byWorkflow: Record<EditorialState, number> = { imported: 0, needs_review: 0, editing: 0, ready: 0, archived: 0, published: 0 }
     let withoutProject = 0
     let issues = 0
     for (const a of assets ?? []) {
-      byWorkflow[a.workflowStatus]++
+      byWorkflow[editorialState(a)]++
       if (!a.projectId && a.workflowStatus !== 'archived') withoutProject++
       const s = assetState(a)
       if (s === 'error' || s === 'missing') issues++
@@ -60,6 +60,7 @@ export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibr
     { label: WORKFLOW_LABELS.needs_review, value: stats.byWorkflow.needs_review, filters: { project: 'all', workflow: 'needs_review' }, tone: 'review', testId: 'tile-review' },
     { label: WORKFLOW_LABELS.editing, value: stats.byWorkflow.editing, filters: { project: 'all', workflow: 'editing' }, testId: 'tile-editing' },
     { label: 'Prontos para publicar', value: stats.byWorkflow.ready, filters: { project: 'all', workflow: 'ready' }, tone: 'ready', testId: 'tile-ready' },
+    { label: 'Publicados', value: stats.byWorkflow.published, filters: { project: 'all', workflow: 'published' }, tone: 'published', testId: 'tile-published' },
     { label: 'Sem projeto', value: stats.withoutProject, filters: { project: 'none', workflow: 'active' }, testId: 'tile-unassigned' }
   ]
 
@@ -126,7 +127,7 @@ export function DashboardScreen({ projects, assets, folders, toolsOk, onOpenLibr
                       <span className="recent-name">{displayName(a)}</span>
                       <span className="small muted">
                         <span className="project-dot" style={{ background: project?.color ?? 'var(--text-faint)' }} aria-hidden="true" />
-                        {project?.name ?? 'Sem projeto'} · {WORKFLOW_LABELS[a.workflowStatus]} · {formatRelative(a.importedAt)}
+                        {project?.name ?? 'Sem projeto'} · {EDITORIAL_LABELS[editorialState(a)]} · {formatRelative(a.importedAt)}
                       </span>
                     </span>
                   </li>

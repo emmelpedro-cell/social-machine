@@ -73,7 +73,20 @@ type PerfRow = {
   aspect_ratio: string | null
   version_duration: number | null
   content_duration: number | null
+  edit_settings_json: string | null
+  views_24h: number | null
+  views_7d: number | null
 } & { [K in keyof SnapshotRow as `m_${K}`]: SnapshotRow[K] | null }
+
+function hasText(settingsJson: string | null): boolean | null {
+  if (!settingsJson) return null
+  try {
+    const texts = (JSON.parse(settingsJson) as { texts?: { text?: string }[] }).texts
+    return Array.isArray(texts) ? texts.some((t) => (t.text ?? '').trim().length > 0) : null
+  } catch {
+    return null
+  }
+}
 
 /** Metric snapshots (history, never overwritten) and the joins Analytics needs. */
 export class MetricsRepository {
@@ -246,12 +259,21 @@ export class MetricsRepository {
     ]
       .map((c) => `${m(c)} AS m_${c}`)
       .join(',\n')
+    const iso = (hours: number) => `strftime('%Y-%m-%dT%H:%M:%fZ', p.published_at, '${hours >= 0 ? '+' : ''}${hours} hours')`
+    // Last views reading in [mark - window, mark], and only once the mark has passed.
+    const mark = (hours: number, window: number) =>
+      `(SELECT s.views FROM metric_snapshots s WHERE s.publication_id = p.id AND s.views IS NOT NULL
+          AND s.captured_at <= ${iso(hours)} AND s.captured_at >= ${iso(hours - window)}
+          AND ${iso(hours)} <= ? ORDER BY s.captured_at DESC LIMIT 1)`
+    const now = this.now()
     const rows = this.db
       .prepare(
         `SELECT p.id AS publication_id, p.content_id, c.title AS content_title, c.file_name AS content_file_name,
            v.version_name, c.project_id, p.account_id, a.display_name AS account_name, a.platform_id, a.is_manual,
            p.title, p.external_url, p.published_at, v.aspect_ratio, v.duration_seconds AS version_duration,
-           c.duration_seconds AS content_duration,
+           c.duration_seconds AS content_duration, v.edit_settings_json,
+           ${mark(24, 6)} AS views_24h,
+           ${mark(7 * 24, 48)} AS views_7d,
            ${snapshotCols}
          FROM publications p
          JOIN accounts a ON a.id = p.account_id
@@ -260,7 +282,7 @@ export class MetricsRepository {
          WHERE p.status = 'published' AND p.published_at IS NOT NULL ${filter.contentId ? 'AND p.content_id = ?' : ''}
          ORDER BY p.published_at DESC`
       )
-      .all(...(filter.contentId ? [filter.contentId] : [])) as PerfRow[]
+      .all(now, now, ...(filter.contentId ? [filter.contentId] : [])) as PerfRow[]
     return rows.map((r) => ({
       publicationId: r.publication_id,
       contentId: r.content_id,
@@ -276,6 +298,9 @@ export class MetricsRepository {
       publishedAt: r.published_at,
       aspectRatio: r.aspect_ratio,
       durationSeconds: num(r.version_duration ?? r.content_duration),
+      hasText: hasText(r.edit_settings_json),
+      views24h: num(r.views_24h),
+      views7d: num(r.views_7d),
       latest: r.m_id
         ? toSnapshot({
             id: r.m_id,

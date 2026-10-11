@@ -17,6 +17,7 @@ import { PublicationsRepository } from '../../src/main/repositories/publications
 import { VersionsRepository } from '../../src/main/repositories/versions'
 import { FileSecretStore, MemorySecretStore } from '../../src/main/secrets/token-store'
 import { defaultEditSettings } from '../../src/shared/editor'
+import { editorialState } from '../../src/shared/media'
 import { composeCaption, type DestinationInput, type PublicationEvent } from '../../src/shared/publishing'
 import { CreateProjectInputSchema } from '../../src/shared/schemas'
 import { FakeGoogle } from '../helpers/fake-google'
@@ -142,6 +143,11 @@ describe('publishing', () => {
     expect(published).toMatchObject({ status: 'published', externalPostId: 'vid-s1', externalUrl: 'https://www.youtube.com/shorts/vid-s1' })
     expect(published.fields.upload).toBeUndefined()
     expect(published.publishedAt).not.toBeNull()
+    // The library shows the content as published (derived from its publications).
+    const asset = new ContentsRepository(db).get(contentId)
+    expect(asset).toMatchObject({ publishedCount: 1, lastPublishedAt: published.publishedAt })
+    expect(editorialState(asset)).toBe('published')
+    expect(editorialState({ ...asset, workflowStatus: 'archived' })).toBe('archived')
 
     expect(google.uploadedVideos).toHaveLength(1)
     const video = google.uploadedVideos[0]!

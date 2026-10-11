@@ -103,6 +103,10 @@ Em **Fila**: o que precisa de você, o que está enviando, as agendadas por dia 
 
 Em **Calendário**: visão de mês, semana e dia, com filtro por projeto e conta. A cor da borda é o projeto. Arraste uma publicação para outro dia para reagendar (mantém o horário).
 
+### Publicado
+
+Um conteúdo com pelo menos uma publicação no ar aparece como **Publicado** na Biblioteca e no Dashboard, com filtro próprio. O status editorial (em edição, pronto etc.) continua guardado por baixo.
+
 ### Analytics
 
 Em **Analytics**:
@@ -114,6 +118,13 @@ Em **Analytics**:
 - **Comparar por** plataforma, projeto, conta, formato ou duração, com gráfico e tabela.
 - A página de cada conteúdo compara todos os destinos lado a lado, com visualizações em 24 h, 7 e 30 dias e um gráfico da evolução.
 - Nada é estimado: o que falta aparece como "indisponível". Engajamento = (curtidas + comentários + compartilhamentos) ÷ visualizações.
+- **Tendências e ideias** (aba no Analytics) compara seu histórico usando as visualizações aos 7 dias de cada vídeo:
+  - o que compara: duração, horário, dia da semana, texto na tela, formato e plataforma;
+  - sempre dentro do mesmo projeto e da mesma rede;
+  - mostra quantos vídeos sustentam cada achado e diz se é "Indício" ou "Tendência", nunca uma causa;
+  - com pouco dado, sugere experimentos;
+  - lista os vídeos que merecem uma nova versão;
+  - compara os últimos 30 dias com os 30 anteriores.
 
 ### Inbox
 

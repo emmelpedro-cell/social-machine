@@ -225,6 +225,12 @@ test('journey', async () => {
   await expect(page.locator('[data-testid="compare-bars"] [data-testid="bar-row"]').first()).toHaveAttribute('data-key', 'TikTok')
   await shot(page, 'analytics-comparando-plataformas')
 
+  // Trends and ideas: with one fresh post, it says there isn't enough data yet and suggests experiments.
+  await page.getByTestId('view-insights').click()
+  await expect(page.getByTestId('insights-experiments')).toBeVisible()
+  await shot(page, 'tendencias-e-ideias')
+  await page.getByTestId('view-overview').click()
+
   // 17. Comments arrive; answer one.
   const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString()
   google.threads.push(
@@ -241,6 +247,11 @@ test('journey', async () => {
   await page.getByTestId('reply-send').click()
   await expect(page.getByTestId('thread').getByTestId('thread-item')).toHaveCount(2)
   await shot(page, 'inbox-resposta-enviada')
+
+  // The library shows the clip as published.
+  await openLibrary(page)
+  await expect(card(page, 'MMA Drop 002 - nocaute.mp4').getByTestId('asset-workflow')).toHaveText('Publicado')
+  await shot(page, 'biblioteca-publicado')
 
   // 18. Dashboard at the end of the day.
   await navigate(page, 'Dashboard')

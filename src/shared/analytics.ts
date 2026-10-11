@@ -90,6 +90,15 @@ export type PerformanceRow = {
   /** Output aspect of the published version (e.g. "9:16"), when known. */
   aspectRatio: string | null
   durationSeconds: number | null
+  /** Whether the published version has on-screen text (null when unknown, e.g. no version). */
+  hasText: boolean | null
+  /**
+   * Views at the 24 h and 7 d marks: the last reading taken shortly before the mark
+   * (within 6 h for 24 h, within 2 days for 7 d). Null until the mark is reached or
+   * when no reading is close enough — so posts of different ages compare fairly.
+   */
+  views24h: number | null
+  views7d: number | null
   latest: MetricSnapshot | null
 }
 

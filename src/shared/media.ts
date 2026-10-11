@@ -52,6 +52,19 @@ export const WORKFLOW_LABELS: Record<WorkflowStatus, string> = {
   archived: 'Arquivado'
 }
 
+/**
+ * What the library shows: the editorial state, except that a content with at
+ * least one publication out is "Publicado" (unless archived). Derived from the
+ * publications, so it never disagrees with them.
+ */
+export type EditorialState = WorkflowStatus | 'published'
+
+export const EDITORIAL_LABELS: Record<EditorialState, string> = { ...WORKFLOW_LABELS, published: 'Publicado' }
+
+export function editorialState(asset: Pick<ContentItem, 'workflowStatus' | 'publishedCount'>): EditorialState {
+  return asset.publishedCount > 0 && asset.workflowStatus !== 'archived' ? 'published' : asset.workflowStatus
+}
+
 export const ORIGIN_LABELS: Record<ContentOrigin, string> = {
   manual: 'Importação manual',
   watch_folder: 'Pasta monitorada',
@@ -73,6 +86,9 @@ export type ContentItem = {
   origin: ContentOrigin
   watchFolderId: string | null
   workflowStatus: WorkflowStatus
+  /** Publications of this content that are out (any version, any destination). */
+  publishedCount: number
+  lastPublishedAt: string | null
   fileName: string
   sourcePath: string
   fileSize: number

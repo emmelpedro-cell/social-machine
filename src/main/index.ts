@@ -213,7 +213,14 @@ function start(): void {
     versions,
     connectors,
     logger: log.child('publish'),
-    emit: sendPublicationEvent,
+    emit: (event) => {
+      sendPublicationEvent(event)
+      // A publication going out changes how the library shows its content ("Publicado").
+      if (event.type === 'publication' && event.publication.status === 'published') {
+        const content = contents.find(event.publication.contentId)
+        if (content) service.announce([content])
+      }
+    },
     notify: desktopNotify
   })
   publishService = publisher

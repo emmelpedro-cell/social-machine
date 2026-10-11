@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  EDITORIAL_LABELS,
+  editorialState,
   ORIGIN_LABELS,
   WORKFLOW_LABELS,
   WORKFLOW_STATUSES,
   type ContentItem,
   type ContentOrigin,
+  type EditorialState,
   type WorkflowStatus
 } from '../../../shared/media'
 import type { Project } from '../../../shared/schemas'
@@ -20,7 +23,7 @@ import { assetState, displayName, importNotice } from '../media/format'
 import type { MediaLibrary } from '../media/useMediaLibrary'
 
 export type ProjectFilter = 'all' | 'none' | string
-export type WorkflowFilter = 'active' | 'all' | WorkflowStatus
+export type WorkflowFilter = 'active' | 'all' | EditorialState
 
 export type LibraryFilters = {
   project: ProjectFilter
@@ -87,7 +90,7 @@ export function LibraryScreen({ library, projects, initialFilters, versionCounts
       .filter((a) => {
         if (workflow === 'all') return true
         if (workflow === 'active') return a.workflowStatus !== 'archived'
-        return a.workflowStatus === workflow
+        return editorialState(a) === workflow
       })
       .filter((a) => origin === 'all' || a.origin === origin)
       .filter((a) => {
@@ -268,11 +271,13 @@ export function LibraryScreen({ library, projects, initialFilters, versionCounts
           >
             <option value="active">Não arquivados</option>
             <option value="all">Todos os status</option>
-            {WORKFLOW_STATUSES.map((s) => (
+            {WORKFLOW_STATUSES.filter((s) => s !== 'archived').map((s) => (
               <option key={s} value={s}>
                 {WORKFLOW_LABELS[s]}
               </option>
             ))}
+            <option value="published">{EDITORIAL_LABELS.published}</option>
+            <option value="archived">{WORKFLOW_LABELS.archived}</option>
           </select>
           <select value={origin} onChange={(e) => setOrigin(e.target.value as OriginFilter)} aria-label="Filtrar por origem">
             <option value="all">Qualquer origem</option>

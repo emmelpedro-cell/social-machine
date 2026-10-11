@@ -2923,3 +2923,77 @@ textarea {
     position: static;
   }
 }
+
+.workflow-badge.wf-published {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  color: var(--success);
+}
+.tile-published .tile-value {
+  color: var(--success);
+}
+
+/* ------------------------------------------------------------------ */
+/* Trends and ideas (Phase 7)                                         */
+/* ------------------------------------------------------------------ */
+
+.insights {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.insight-list,
+.experiment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.insight {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+}
+.insight-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.insight p,
+.experiment-list p {
+  margin: 0;
+}
+.experiment-list li {
+  display: grid;
+  gap: 4px;
+}
+.evidence {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+}
+.evidence.ev-trend {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 50%, var(--line));
+}
+.evidence.ev-hint {
+  color: #ffc53d;
+  border-color: color-mix(in srgb, #ffc53d 50%, var(--line));
+}
+.delta {
+  font-size: 11px;
+  margin-left: 4px;
+}
+.delta.is-up {
+  color: var(--success);
+}
+.delta.is-down {
+  color: var(--danger);
+}

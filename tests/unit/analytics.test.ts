@@ -213,6 +213,24 @@ describe('analytics', () => {
     expect(accounts.get(account.id).connectionStatus).toBe('expired')
   })
 
+  it('reads the 24 h and 7 d marks from readings close to them, only once reached', async () => {
+    const account = await youtube.connect([])
+    const old = published(account.id, 'vidA', 10 * DAY)
+    const stale = published(account.id, 'vidB', 10 * DAY)
+    const fresh = published(account.id, 'vidC', 3 * DAY)
+    const at = (p: { publishedAt: string | null }, hours: number) => new Date(new Date(p.publishedAt!).getTime() + hours * HOUR).toISOString()
+    const values = (views: number) => ({ ...emptyMetrics(), views })
+    metrics.insert(old.id, at(old, 20), values(100), 'api')
+    metrics.insert(old.id, at(old, 6.5 * 24), values(900), 'api')
+    metrics.insert(old.id, at(old, 9 * 24), values(1500), 'api')
+    metrics.insert(stale.id, at(stale, 2 * 24), values(400), 'api') // nothing near the 7-day mark
+    metrics.insert(fresh.id, at(fresh, 23), values(50), 'api')
+    const rows = new Map(service.overview().rows.map((r) => [r.publicationId, r]))
+    expect(rows.get(old.id)).toMatchObject({ views24h: 100, views7d: 900, hasText: false })
+    expect(rows.get(stale.id)).toMatchObject({ views24h: null, views7d: null })
+    expect(rows.get(fresh.id)).toMatchObject({ views24h: 50, views7d: null })
+  })
+
   it('records numbers typed in for manual destinations, and only there', async () => {
     const yt = await youtube.connect([])
     const tiktok = accounts.addManual({ platformId: 'tiktok', displayName: '@cortes', projectIds: [] })

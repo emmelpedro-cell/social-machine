@@ -17,6 +17,7 @@ import { BarList, type BarItem } from '../analytics/BarList'
 import { ContentPerformance } from '../analytics/ContentPerformance'
 import { fmtCount, fmtDuration, fmtPercent, UNAVAILABLE } from '../analytics/format'
 import { useAnalyticsOverview } from '../analytics/useAnalytics'
+import { InsightsView } from '../analytics/InsightsView'
 import type { NoticeState } from '../components/Notice'
 import { formatRelative } from '../format'
 import { PLATFORM_LABEL } from '../publishing/PublicationsList'
@@ -83,6 +84,7 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
   const [measure, setMeasure] = useState<Measure>('avgViews')
   const [sort, setSort] = useState<'views' | 'engagement' | 'recent'>('views')
   const [refreshing, setRefreshing] = useState(false)
+  const [view, setView] = useState<'overview' | 'insights'>('overview')
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects])
   const rows = useMemo(
@@ -97,6 +99,16 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
     [data, period, project, platform, account]
   )
   const total = useMemo(() => aggregate(rows), [rows])
+  const historyRows = useMemo(
+    () =>
+      (data?.rows ?? []).filter(
+        (r) =>
+          (project === 'all' || (project === 'none' ? r.projectId === null : r.projectId === project)) &&
+          (platform === 'all' || r.platformId === platform) &&
+          (account === 'all' || r.accountId === account)
+      ),
+    [data, project, platform, account]
+  )
 
   const bars: BarItem[] = useMemo(() => {
     const keyOf: Record<Dimension, (r: PerformanceRow) => string> = {
@@ -231,7 +243,17 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
         </button>
       </header>
 
+      <div className="segmented tabs" role="tablist" aria-label="Visão">
+        <button type="button" className={view === 'overview' ? 'is-active' : ''} onClick={() => setView('overview')} data-testid="view-overview">
+          Visão geral
+        </button>
+        <button type="button" className={view === 'insights' ? 'is-active' : ''} onClick={() => setView('insights')} data-testid="view-insights">
+          Tendências e ideias
+        </button>
+      </div>
+
       <div className="filter-row" role="group" aria-label="Filtros">
+        {view === 'overview' && (
         <div className="segmented" role="tablist" aria-label="Período">
           {PERIODS.map((p) => (
             <button key={p.id} type="button" className={period === p.id ? 'is-active' : ''} onClick={() => setPeriod(p.id)} data-testid={`period-${p.id}`}>
@@ -239,6 +261,7 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
             </button>
           ))}
         </div>
+        )}
         <select value={project} onChange={(e) => setProject(e.target.value)} aria-label="Projeto" data-testid="analytics-project">
           <option value="all">Todos os projetos</option>
           {projects.map((p) => (
@@ -279,6 +302,10 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
         </div>
       ))}
 
+      {view === 'insights' && <InsightsView rows={historyRows} projects={projects} onOpenContent={(id) => onOpenContent(id)} />}
+
+      {view === 'overview' && (
+      <>
       {data && data.rows.length === 0 && (
         <section className="panel">
           <p className="lead">Nada publicado ainda.</p>
@@ -465,6 +492,8 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
         </aside>
       </div>
       <p className="muted small">Engajamento = {ENGAGEMENT_FORMULA}, calculado só onde os quatro números existem (média ponderada pelas visualizações).</p>
+      </>
+      )}
     </div>
   )
 }

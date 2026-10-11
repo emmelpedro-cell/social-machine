@@ -23,6 +23,8 @@ type Row = {
   origin: ContentOrigin
   watch_folder_id: string | null
   workflow_status: WorkflowStatus
+  published_count: number
+  last_published_at: string | null
   source_path: string
   path_key: string
   file_name: string
@@ -59,6 +61,8 @@ function toAsset(row: Row): ContentItem {
     origin: row.origin,
     watchFolderId: row.watch_folder_id,
     workflowStatus: row.workflow_status,
+    publishedCount: Number(row.published_count ?? 0),
+    lastPublishedAt: row.last_published_at ?? null,
     fileName: row.file_name,
     sourcePath: row.source_path,
     fileSize: Number(row.file_size),
@@ -85,7 +89,9 @@ function toAsset(row: Row): ContentItem {
 
 const COLUMNS = `id, project_id, title, origin, watch_folder_id, workflow_status, source_path, path_key, file_name, file_size, file_mtime_ms, content_hash, kind, status,
   error_message, availability, duration_seconds, container, video_codec, audio_codec, width, height,
-  frame_rate, rotation, sample_rate, channels, bit_rate, thumbnail_path, imported_at, updated_at`
+  frame_rate, rotation, sample_rate, channels, bit_rate, thumbnail_path, imported_at, updated_at,
+  (SELECT COUNT(*) FROM publications p WHERE p.content_id = contents.id AND p.status = 'published') AS published_count,
+  (SELECT MAX(p.published_at) FROM publications p WHERE p.content_id = contents.id AND p.status = 'published') AS last_published_at`
 
 const CLEAR_METADATA = `kind = NULL, duration_seconds = NULL, container = NULL, video_codec = NULL,
   audio_codec = NULL, width = NULL, height = NULL, frame_rate = NULL, rotation = NULL, sample_rate = NULL,

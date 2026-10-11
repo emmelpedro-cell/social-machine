@@ -152,6 +152,23 @@ test('compares real metrics by platform and per content, never inventing missing
   await page.getByTestId('dimension-project').click()
   await expect(bars.first()).toHaveAttribute('data-key', 'MMA')
 
+  // Trends need 7-day numbers: with two fresh posts it says so, and suggests experiments.
+  await page.getByTestId('view-insights').click()
+  await expect(page.getByTestId('insights-empty')).toBeVisible()
+  await expect(page.getByTestId('insights-trends')).toContainText('0 de 2 publicações com número de 7 dias')
+  await expect(page.getByTestId('insights-experiments')).toContainText('Experimente MMA no Instagram')
+  await expect(page.getByTestId('period-posts')).toContainText('2')
+  await page.getByTestId('view-overview').click()
+
+  // The library and the dashboard show the content as published.
+  await openLibrary(page)
+  await expect(card(page, 'Nocaute.mp4').getByTestId('asset-workflow')).toHaveText('Publicado')
+  await page.getByTestId('filter-workflow').selectOption('published')
+  await expect(card(page, 'Nocaute.mp4')).toBeVisible()
+  await page.getByTestId('filter-workflow').selectOption('active')
+  await navigate(page, 'Dashboard')
+  await expect(page.getByTestId('tile-published')).toContainText('1')
+
   // From the library too.
   await openLibrary(page)
   await openCard(page, 'Nocaute.mp4')

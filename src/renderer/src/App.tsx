@@ -1,3 +1,4 @@
+import { editorialState } from '../../shared/media'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AppInfo, CreateProjectInput, Project, Settings, UpdateProjectInput } from '../../shared/schemas'
 import { api, errorMessage, unwrap } from './api'
@@ -91,7 +92,7 @@ export function App() {
   }, [settings])
 
   const needsReview = useMemo(
-    () => library.assets?.filter((a) => a.workflowStatus === 'needs_review').length ?? 0,
+    () => library.assets?.filter((a) => editorialState(a) === 'needs_review').length ?? 0,
     [library.assets]
   )
 
