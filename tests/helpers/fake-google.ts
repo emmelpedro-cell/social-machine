@@ -30,6 +30,14 @@ export class FakeGoogle {
   quotaExceeded = false
   channel: { id: string; title: string } | null = { id: 'UC123', title: 'MMA Cortes' }
   revoked: string[] = []
+  // Metrics
+  /** videos.list statistics per video id; uploaded videos not listed here report zeros. */
+  readonly videoStats = new Map<string, Record<string, string>>()
+  /** YouTube Analytics values per video id; videos absent here have no row (data not ready yet). */
+  readonly videoAnalytics = new Map<string, { minutes: number; avgDuration: number; avgPercentage: number; shares: number; subscribers: number }>()
+  channelStats: Record<string, string | boolean> = { subscriberCount: '1200', viewCount: '50000', videoCount: '12', hiddenSubscriberCount: false }
+  analyticsDisabled = false
+  readonly analyticsQueries: URLSearchParams[] = []
 
   async start(): Promise<void> {
     this.server = createServer((req, res) => void this.handle(req, res))
@@ -40,7 +48,8 @@ export class FakeGoogle {
       token: `${base}/token`,
       revoke: `${base}/revoke`,
       api: `${base}/youtube/v3`,
-      upload: `${base}/upload/youtube/v3`
+      upload: `${base}/upload/youtube/v3`,
+      analytics: `${base}/youtube-analytics/v2`
     }
   }
 
@@ -142,7 +151,48 @@ export class FakeGoogle {
 
     if (req.method === 'GET' && url.pathname === '/youtube/v3/channels') {
       if (!this.authorized(req, res)) return
-      this.json(res, 200, { items: this.channel ? [{ id: this.channel.id, snippet: { title: this.channel.title } }] : [] })
+      const withStats = (url.searchParams.get('part') ?? '').includes('statistics')
+      this.json(res, 200, {
+        items: this.channel ? [{ id: this.channel.id, snippet: { title: this.channel.title }, ...(withStats ? { statistics: this.channelStats } : {}) }] : []
+      })
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/youtube/v3/videos') {
+      if (!this.authorized(req, res)) return
+      const ids = (url.searchParams.get('id') ?? '').split(',').filter(Boolean)
+      if (ids.length > 50) {
+        this.json(res, 400, { error: { code: 400, message: 'Too many ids', errors: [{ reason: 'invalidFilters' }] } })
+        return
+      }
+      const known = (id: string) => this.videoStats.has(id) || this.uploadedVideos.some((v) => v.id === id)
+      this.json(res, 200, {
+        items: ids.filter(known).map((id) => ({ id, statistics: this.videoStats.get(id) ?? { viewCount: '0', likeCount: '0', favoriteCount: '0', commentCount: '0' } }))
+      })
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/youtube-analytics/v2/reports') {
+      if (!this.authorized(req, res)) return
+      this.analyticsQueries.push(url.searchParams)
+      if (this.analyticsDisabled) {
+        this.json(res, 403, {
+          error: { code: 403, message: 'YouTube Analytics API has not been used in project 123 before or it is disabled.', status: 'PERMISSION_DENIED', errors: [{ reason: 'accessNotConfigured' }] }
+        })
+        return
+      }
+      const filter = url.searchParams.get('filters') ?? ''
+      const ids = filter.startsWith('video==') ? filter.slice(7).split(',') : []
+      const metrics = (url.searchParams.get('metrics') ?? '').split(',')
+      const value = (row: { minutes: number; avgDuration: number; avgPercentage: number; shares: number; subscribers: number }, m: string) =>
+        ({ estimatedMinutesWatched: row.minutes, averageViewDuration: row.avgDuration, averageViewPercentage: row.avgPercentage, shares: row.shares, subscribersGained: row.subscribers })[m] ?? 0
+      this.json(res, 200, {
+        kind: 'youtubeAnalytics#resultTable',
+        columnHeaders: [{ name: 'video', columnType: 'DIMENSION', dataType: 'STRING' }, ...metrics.map((name) => ({ name, columnType: 'METRIC', dataType: 'INTEGER' }))],
+        ...(ids.some((id) => this.videoAnalytics.has(id))
+          ? { rows: ids.filter((id) => this.videoAnalytics.has(id)).map((id) => [id, ...metrics.map((m) => value(this.videoAnalytics.get(id)!, m))]) }
+          : {})
+      })
       return
     }
 

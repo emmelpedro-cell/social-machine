@@ -28,11 +28,16 @@ const REASON_MESSAGES: Record<string, string> = {
   invalidTags: 'As tags não foram aceitas pelo YouTube.',
   invalidCategoryId: 'A categoria escolhida não existe para esse canal.',
   mediaBodyRequired: 'O arquivo de vídeo não chegou ao YouTube.',
+  accessNotConfigured:
+    'A YouTube Analytics API não está ativada no seu projeto do Google Cloud. Ative-a (APIs e serviços → Biblioteca → YouTube Analytics API) para ver tempo assistido, compartilhamentos e inscritos ganhos.',
+  SERVICE_DISABLED:
+    'A YouTube Analytics API não está ativada no seu projeto do Google Cloud. Ative-a (APIs e serviços → Biblioteca → YouTube Analytics API) para ver tempo assistido, compartilhamentos e inscritos ganhos.',
+  insufficientPermissions: 'O login do YouTube não tem permissão para ler estatísticas. Reconecte a conta em Contas.',
   rateLimitExceeded: 'Muitos pedidos ao YouTube em pouco tempo. Tentando de novo em instantes.',
   userRateLimitExceeded: 'Muitos pedidos ao YouTube em pouco tempo. Tentando de novo em instantes.'
 }
 
-async function apiError(response: Response, fallback: string): Promise<YouTubeApiError> {
+export async function apiError(response: Response, fallback: string): Promise<YouTubeApiError> {
   const body = (await response.json().catch(() => null)) as {
     error?: { message?: string; errors?: { reason?: string }[]; status?: string }
   } | null
@@ -287,4 +292,113 @@ export async function uploadVideo(options: UploadOptions): Promise<{ videoId: st
   } finally {
     await file.close()
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Metrics                                                            */
+/* ------------------------------------------------------------------ */
+
+export type VideoStats = { views: number | null; likes: number | null; comments: number | null }
+
+const toNum = (v: unknown): number | null => (v === undefined || v === null || v === '' ? null : Number(v))
+
+/**
+ * Public counters from videos.list (1 quota unit per call, up to 50 ids).
+ * A counter the owner hid (e.g. likes) is absent and stays null. Videos not
+ * returned (deleted, or no longer accessible) are missing from the map.
+ */
+export async function getVideoStats(
+  fetch: Fetch,
+  accessToken: string,
+  ids: readonly string[],
+  endpoints: GoogleEndpoints = GOOGLE_ENDPOINTS
+): Promise<Map<string, VideoStats>> {
+  const out = new Map<string, VideoStats>()
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50)
+    const response = await fetch(`${endpoints.api}/videos?part=statistics&id=${chunk.map(encodeURIComponent).join(',')}&maxResults=50`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+    if (!response.ok) throw await apiError(response, 'Não foi possível ler as estatísticas dos vídeos')
+    const body = (await response.json()) as { items?: { id: string; statistics?: Record<string, string> }[] }
+    for (const item of body.items ?? []) {
+      const s = item.statistics ?? {}
+      out.set(item.id, { views: toNum(s['viewCount']), likes: toNum(s['likeCount']), comments: toNum(s['commentCount']) })
+    }
+  }
+  return out
+}
+
+export type ChannelStats = { subscribers: number | null; views: number | null; videos: number | null }
+
+/** Channel counters (channels.list, 1 unit). A hidden subscriber count stays null. */
+export async function getChannelStats(fetch: Fetch, accessToken: string, endpoints: GoogleEndpoints = GOOGLE_ENDPOINTS): Promise<ChannelStats> {
+  const response = await fetch(`${endpoints.api}/channels?part=statistics&mine=true`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!response.ok) throw await apiError(response, 'Não foi possível ler as estatísticas do canal')
+  const body = (await response.json()) as { items?: { statistics?: Record<string, string | boolean> }[] }
+  const s = body.items?.[0]?.statistics ?? {}
+  return {
+    subscribers: s['hiddenSubscriberCount'] === true ? null : toNum(s['subscriberCount']),
+    views: toNum(s['viewCount']),
+    videos: toNum(s['videoCount'])
+  }
+}
+
+export type VideoAnalytics = {
+  watchTimeSeconds: number | null
+  averageViewDurationSeconds: number | null
+  averageViewPercentage: number | null
+  shares: number | null
+  subscribersGained: number | null
+}
+
+const ANALYTICS_METRICS = ['estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage', 'shares', 'subscribersGained'] as const
+
+/**
+ * Per-video totals from the YouTube Analytics API (reports.query with the
+ * `video` dimension) from `startDate` to today. Analytics data lags by a day
+ * or more, so very new videos may be absent: they stay null, never zero.
+ */
+export async function getVideoAnalytics(
+  fetch: Fetch,
+  accessToken: string,
+  ids: readonly string[],
+  startDate: string,
+  endDate: string,
+  endpoints: GoogleEndpoints = GOOGLE_ENDPOINTS
+): Promise<Map<string, VideoAnalytics>> {
+  const out = new Map<string, VideoAnalytics>()
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50)
+    const params = new URLSearchParams({
+      ids: 'channel==MINE',
+      startDate,
+      endDate,
+      metrics: ANALYTICS_METRICS.join(','),
+      dimensions: 'video',
+      filters: `video==${chunk.join(',')}`,
+      sort: '-estimatedMinutesWatched',
+      maxResults: '200'
+    })
+    const response = await fetch(`${endpoints.analytics}/reports?${params.toString()}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+    if (!response.ok) throw await apiError(response, 'Não foi possível ler o YouTube Analytics')
+    const body = (await response.json()) as { columnHeaders?: { name: string }[]; rows?: (string | number)[][] }
+    const names = (body.columnHeaders ?? []).map((h) => h.name)
+    const col = (row: (string | number)[], name: string) => {
+      const index = names.indexOf(name)
+      return index === -1 ? null : toNum(row[index])
+    }
+    for (const row of body.rows ?? []) {
+      const videoId = String(row[names.indexOf('video')])
+      const minutes = col(row, 'estimatedMinutesWatched')
+      out.set(videoId, {
+        watchTimeSeconds: minutes === null ? null : minutes * 60,
+        averageViewDurationSeconds: col(row, 'averageViewDuration'),
+        averageViewPercentage: col(row, 'averageViewPercentage'),
+        shares: col(row, 'shares'),
+        subscribersGained: col(row, 'subscribersGained')
+      })
+    }
+  }
+  return out
 }

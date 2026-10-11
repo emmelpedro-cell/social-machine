@@ -28,11 +28,11 @@ export function Sidebar({ current, onNavigate, version, needsReview, attention }
     { id: 'editor', label: 'Editor' },
     { id: 'queue', label: 'Fila', badge: attention },
     { id: 'calendar', label: 'Calendário' },
+    { id: 'analytics', label: 'Analytics' },
     { id: 'projects', label: 'Projetos' },
     { id: 'accounts', label: 'Contas' }
   ]
   const later: Item[] = [
-    { id: 'analytics', label: 'Analytics', phase: 5 },
     { id: 'inbox', label: 'Inbox', phase: 6 }
   ]
 
@@ -87,7 +87,7 @@ export function Sidebar({ current, onNavigate, version, needsReview, attention }
         >
           Configurações
         </button>
-        <p className="build-tag">Fase 4 · fila e calendário{version ? ` · v${version}` : ''}</p>
+        <p className="build-tag">Fase 5 · analytics{version ? ` · v${version}` : ''}</p>
       </div>
     </nav>
   )

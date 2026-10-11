@@ -38,6 +38,8 @@ import { PublishService } from './publishing/publish-service'
 import { AccountsRepository } from './repositories/accounts'
 import { PublicationsRepository } from './repositories/publications'
 import { QueueSettingsRepository } from './repositories/queue-settings'
+import { MetricsRepository } from './repositories/metrics'
+import { MetricsService } from './analytics/metrics-service'
 import { FileSecretStore } from './secrets/token-store'
 
 const APP_NAME = 'Social Machine'
@@ -62,6 +64,7 @@ let importService: ImportService | null = null
 let watchService: WatchService | null = null
 let renderService: RenderService | null = null
 let publishService: PublishService | null = null
+let analyticsService: MetricsService | null = null
 let settingsRepo: SettingsRepository | null = null
 let quitting = false
 let trayHintShown = false
@@ -200,11 +203,12 @@ function start(): void {
     logger: log.child('youtube'),
     endpoints: googleEndpoints()
   })
+  const connectors = { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') }
   const publisher = new PublishService({
     publications,
     accounts,
     versions,
-    connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
+    connectors,
     logger: log.child('publish'),
     emit: sendPublicationEvent,
     notify: (title, body) => {
@@ -215,6 +219,17 @@ function start(): void {
     }
   })
   publishService = publisher
+  const metricsService = new MetricsService({
+    metrics: new MetricsRepository(opened.db),
+    accounts,
+    publications,
+    connectors,
+    logger: log.child('metrics'),
+    emit: () => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IpcEvents.analytics, { type: 'metrics' })
+    }
+  })
+  analyticsService = metricsService
 
   protocol.handle(MEDIA_SCHEME, (request) =>
     handleMediaRequest(request, { repo: contents, thumbnailsDirectory: layout.thumbnails, versions })
@@ -359,6 +374,7 @@ function start(): void {
         await shell.openExternal(url)
       }
     },
+    analytics: metricsService,
     onSettingsChanged: () => applyOsSettings()
   })
 
@@ -379,6 +395,7 @@ function start(): void {
   service.start()
   void renderer.start().catch((error) => log.error('Render recovery failed', { error }))
   publisher.start()
+  metricsService.start()
   // Reconciliation: files created while the app was closed are found here.
   void watcher.start().catch((error) => log.error('Folder watching failed to start', { error }))
 
@@ -629,6 +646,7 @@ app.on('will-quit', () => {
     renderService?.shutdown()
     // Interrupted uploads continue from their saved session on the next start.
     publishService?.shutdown()
+    analyticsService?.shutdown()
     // Stop FFmpeg child processes; unfinished imports resume on the next start.
     importService?.shutdown()
     tray?.destroy()

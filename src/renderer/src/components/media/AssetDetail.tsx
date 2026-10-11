@@ -30,12 +30,13 @@ type Props = {
   projects: Project[]
   onOpenEditor: () => void
   onOpenAccounts: () => void
+  onOpenAnalytics?: (contentId: string) => void
   onClose: () => void
   onNotice: (n: NoticeState) => void
   onError: (e: unknown) => void
 }
 
-export function AssetDetail({ asset, projects, onOpenEditor, onOpenAccounts, onClose, onNotice, onError }: Props) {
+export function AssetDetail({ asset, projects, onOpenEditor, onOpenAccounts, onOpenAnalytics, onClose, onNotice, onError }: Props) {
   const { versions } = useVersions(asset.id)
   const { publications } = usePublications(asset.id)
   const [publishing, setPublishing] = useState<ContentVersion | null>(null)
@@ -246,7 +247,14 @@ export function AssetDetail({ asset, projects, onOpenEditor, onOpenAccounts, onC
       </section>
 
       <section className="detail-versions" data-testid="detail-publications">
-        <h3 className="small-heading">Publicações</h3>
+        <div className="row">
+          <h3 className="small-heading">Publicações</h3>
+          {onOpenAnalytics && (publications ?? []).some((p) => p.status === 'published') && (
+            <button type="button" className="link-btn small" onClick={() => onOpenAnalytics(asset.id)} data-testid="open-performance">
+              Ver desempenho
+            </button>
+          )}
+        </div>
         <PublicationsList publications={publications} onNotice={onNotice} onError={onError} />
       </section>
 

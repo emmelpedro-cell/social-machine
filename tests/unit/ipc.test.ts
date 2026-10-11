@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { MetricsService } from '../../src/main/analytics/metrics-service'
+import { MetricsRepository } from '../../src/main/repositories/metrics'
+import { QueueSettingsRepository } from '../../src/main/repositories/queue-settings'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { ALL_IPC_CHANNELS, IpcChannels } from '../../src/shared/channels'
@@ -133,6 +136,7 @@ function setup() {
       accounts,
       publications,
       service: publisher,
+      queueSettings: new QueueSettingsRepository(db),
       youtubeConfig,
       connectYouTube: (projectIds) => youtube.connect(projectIds),
       disconnect: async (id) => {
@@ -145,7 +149,16 @@ function setup() {
       openExternal: async (url) => {
         opened.push(url)
       }
-    }
+    },
+    analytics: new MetricsService({
+      metrics: new MetricsRepository(db),
+      accounts,
+      publications,
+      connectors: { youtube, tiktok: new ManualConnector('tiktok'), instagram: new ManualConnector('instagram') },
+      logger,
+      emit: () => {},
+      tickMs: 0
+    })
   })
   const call = <T>(channel: keyof HandlerTable, input?: unknown) =>
     wrapHandler(channel, table[channel], logger)(input) as Promise<IpcResult<T>>

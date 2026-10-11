@@ -153,6 +153,20 @@ const api: SmApi = {
     nextSlots: (accountId, count, after) =>
       call(IpcChannels.queueNextSlots, after ? { accountId, count: count ?? 1, after } : { accountId, count: count ?? 1 })
   },
+  analytics: {
+    overview: () => call(IpcChannels.analyticsOverview),
+    content: (contentId) => call(IpcChannels.analyticsContent, { contentId }),
+    refresh: (accountId) => call(IpcChannels.analyticsRefresh, accountId ? { accountId } : {}),
+    addManual: (input) => call(IpcChannels.analyticsAddManual, input),
+    deleteManual: (id) => call(IpcChannels.analyticsDeleteManual, { id }),
+    onEvent: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on(IpcEvents.analytics, handler)
+      return () => {
+        ipcRenderer.removeListener(IpcEvents.analytics, handler)
+      }
+    }
+  },
   settings: {
     get: () => call(IpcChannels.settingsGet),
     update: (input) => call(IpcChannels.settingsUpdate, input),

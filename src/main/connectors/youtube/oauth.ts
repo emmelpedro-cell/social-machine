@@ -17,6 +17,8 @@ export type GoogleEndpoints = {
   revoke: string
   api: string
   upload: string
+  /** YouTube Analytics API v2 (watch time, shares, subscribers gained). */
+  analytics: string
 }
 
 export const GOOGLE_ENDPOINTS: GoogleEndpoints = {
@@ -24,10 +26,11 @@ export const GOOGLE_ENDPOINTS: GoogleEndpoints = {
   token: 'https://oauth2.googleapis.com/token',
   revoke: 'https://oauth2.googleapis.com/revoke',
   api: 'https://www.googleapis.com/youtube/v3',
-  upload: 'https://www.googleapis.com/upload/youtube/v3'
+  upload: 'https://www.googleapis.com/upload/youtube/v3',
+  analytics: 'https://youtubeanalytics.googleapis.com/v2'
 }
 
-/** Upload videos and read the channel. `youtube.readonly` is added for metrics in a later phase. */
+/** Upload videos; read the channel, video statistics and YouTube Analytics reports (which accept `youtube.readonly`). */
 export const YOUTUBE_SCOPES = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly']
 
 export type OAuthClient = { clientId: string; clientSecret: string }

@@ -74,6 +74,11 @@ export const IpcChannels = {
   queueSettingsList: 'queue-settings:list',
   queueSettingsSave: 'queue-settings:save',
   queueNextSlots: 'queue:next-slots',
+  analyticsOverview: 'analytics:overview',
+  analyticsContent: 'analytics:content',
+  analyticsRefresh: 'analytics:refresh',
+  analyticsAddManual: 'analytics:add-manual',
+  analyticsDeleteManual: 'analytics:delete-manual',
   settingsGet: 'settings:get',
   settingsUpdate: 'settings:update',
   settingsChooseDataDirectory: 'settings:choose-data-directory',
@@ -90,5 +95,6 @@ export const IpcEvents = {
   media: 'media:event',
   watch: 'watch:event',
   versions: 'versions:event',
-  publishing: 'publishing:event'
+  publishing: 'publishing:event',
+  analytics: 'analytics:event'
 } as const

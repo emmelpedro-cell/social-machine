@@ -4,8 +4,17 @@ import type { Logger } from '../../logger'
 import type { AccountRecord, AccountsRepository } from '../../repositories/accounts'
 import type { SecretStore } from '../../secrets/token-store'
 import type { YouTubeClientConfig } from '../config'
-import { ReauthorizeError, type Connector, type PublishableVersion, type PublishContext, type PublishResult } from '../types'
-import { getMyChannel, uploadVideo, YouTubeApiError } from './api'
+import {
+  ReauthorizeError,
+  type CollectedMetrics,
+  type Connector,
+  type MetricsRequest,
+  type PublishableVersion,
+  type PublishContext,
+  type PublishResult
+} from '../types'
+import { getChannelStats, getMyChannel, getVideoAnalytics, getVideoStats, uploadVideo, YouTubeApiError, type VideoAnalytics } from './api'
+import type { MetricValues } from '../../../shared/analytics'
 import {
   authorizeWithLoopback,
   GOOGLE_ENDPOINTS,
@@ -51,7 +60,7 @@ export class YouTubeConnector implements Connector {
     return {
       id: 'youtube',
       name: 'YouTube',
-      capabilities: ['publish'],
+      capabilities: ['publish', 'metrics'],
       note:
         'Envio pela API oficial do YouTube (OAuth). Requer um OAuth Client ID do tipo "App para computador" criado por você no Google Cloud. ' +
         'Com o projeto do Google em modo "Teste", o login expira a cada 7 dias e a conta precisa ser reconectada.',
@@ -183,5 +192,72 @@ export class YouTubeConnector implements Connector {
       }
       throw error
     }
+  }
+
+  /**
+   * Counters from the Data API (fresh) plus watch time, shares and subscribers
+   * gained from the YouTube Analytics API (lagging a day or more). If Analytics
+   * fails, the counters are still saved and the reason is returned as a warning.
+   */
+  async collectMetrics(account: AccountRecord, items: readonly MetricsRequest[]): Promise<CollectedMetrics> {
+    const call = async <T>(fn: (token: string) => Promise<T>): Promise<T> => {
+      try {
+        return await fn(await this.accessToken(account))
+      } catch (error) {
+        if (error instanceof YouTubeApiError && error.unauthorized) {
+          try {
+            return await fn(await this.accessToken(account, true))
+          } catch (again) {
+            if (again instanceof YouTubeApiError && again.unauthorized) {
+              this.options.accounts.setStatus(account.id, 'expired', again.message)
+              throw new ReauthorizeError(again.message)
+            }
+            throw again
+          }
+        }
+        throw error
+      }
+    }
+    const ids = [...new Set(items.map((i) => i.externalPostId))]
+    const stats = ids.length ? await call((t) => getVideoStats(this.options.fetch, t, ids, this.endpoints)) : new Map()
+    let warning: string | null = null
+    let analytics: Map<string, VideoAnalytics> | null = null
+    if (ids.length) {
+      const day = (ms: number) => new Date(ms).toISOString().slice(0, 10)
+      const start = day(Math.min(...items.map((i) => new Date(i.publishedAt).getTime())))
+      try {
+        analytics = await call((t) => getVideoAnalytics(this.options.fetch, t, ids, start, day(this.now()), this.endpoints))
+      } catch (error) {
+        if (error instanceof ReauthorizeError) throw error
+        warning = error instanceof YouTubeApiError ? error.message : `YouTube Analytics indisponível: ${(error as Error).message}`
+        this.options.logger.warn('YouTube Analytics failed', { account: account.id, error })
+      }
+    }
+    let channel: CollectedMetrics['account'] = null
+    try {
+      const c = await call((t) => getChannelStats(this.options.fetch, t, this.endpoints))
+      channel = { followers: c.subscribers, totalViews: c.views, videoCount: c.videos }
+    } catch (error) {
+      if (error instanceof ReauthorizeError) throw error
+      this.options.logger.warn('Channel statistics failed', { account: account.id, error })
+    }
+    const publications = new Map<string, MetricValues>()
+    for (const item of items) {
+      const s = stats.get(item.externalPostId)
+      if (!s) continue
+      const a = analytics?.get(item.externalPostId) ?? null
+      publications.set(item.publicationId, {
+        views: s.views,
+        likes: s.likes,
+        comments: s.comments,
+        shares: a?.shares ?? null,
+        followersGained: a?.subscribersGained ?? null,
+        watchTimeSeconds: a?.watchTimeSeconds ?? null,
+        averageViewDurationSeconds: a?.averageViewDurationSeconds ?? null,
+        extra: { averageViewPercentage: a?.averageViewPercentage ?? null, analyticsIncluded: a !== null }
+      })
+    }
+    if (account.connectionStatus !== 'connected') this.options.accounts.setStatus(account.id, 'connected')
+    return { publications, account: channel, warning }
   }
 }

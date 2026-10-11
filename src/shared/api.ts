@@ -30,6 +30,7 @@ import type {
   QueueItem,
   QueueSettings
 } from './publishing'
+import type { AnalyticsOverview, ContentAnalytics, ManualMetricsInput, MetricSnapshot, RefreshResult } from './analytics'
 import type {
   AddWatchFolderResult,
   UpdateWatchFolderInput,
@@ -171,6 +172,18 @@ export interface SmApi {
     saveSettings(settings: QueueSettings): Promise<IpcResult<QueueSettings>>
     /** Next free posting slots of an account (ISO times). */
     nextSlots(accountId: string, count?: number, after?: string): Promise<IpcResult<string[]>>
+  }
+  analytics: {
+    /** Every published publication with its latest metrics, plus per-account collection status. */
+    overview(): Promise<IpcResult<AnalyticsOverview>>
+    /** One content's publications and their snapshot history. */
+    content(contentId: string): Promise<IpcResult<ContentAnalytics>>
+    /** Collects metrics now (all API accounts, or one). */
+    refresh(accountId?: string): Promise<IpcResult<RefreshResult>>
+    /** Numbers read in the platform's app, for manual destinations. */
+    addManual(input: ManualMetricsInput): Promise<IpcResult<MetricSnapshot>>
+    deleteManual(id: string): Promise<IpcResult<null>>
+    onEvent(listener: () => void): () => void
   }
   settings: {
     get(): Promise<IpcResult<Settings>>

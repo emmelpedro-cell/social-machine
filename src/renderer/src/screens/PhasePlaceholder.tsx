@@ -32,19 +32,9 @@ export function PhasePlaceholder({ title, phase, summary, planned }: Placeholder
   )
 }
 
-export type PlaceholderId = 'inbox' | 'analytics'
+export type PlaceholderId = 'inbox'
 
 export const PLACEHOLDERS: Record<PlaceholderId, PlaceholderProps> = {
-  analytics: {
-    title: 'Analytics',
-    phase: 5,
-    summary: 'Comparar desempenho por conteúdo, projeto e rede, apenas com dados reais das APIs.',
-    planned: [
-      'Histórico de métricas ao longo do tempo',
-      'Comparação do mesmo conteúdo entre plataformas',
-      'Dados indisponíveis indicados como indisponíveis, nunca como zero'
-    ]
-  },
   inbox: {
     title: 'Inbox',
     phase: 6,

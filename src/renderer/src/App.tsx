@@ -16,6 +16,7 @@ import { PhasePlaceholder, PLACEHOLDERS, type PlaceholderId } from './screens/Ph
 import { EditorScreen } from './screens/EditorScreen'
 import { AccountsScreen } from './screens/AccountsScreen'
 import { QueueScreen } from './screens/QueueScreen'
+import { AnalyticsScreen } from './screens/AnalyticsScreen'
 import { CalendarScreen } from './screens/CalendarScreen'
 import { useAttentionCount } from './queue/useAttention'
 import { useVersionCounts } from './editor/useVersions'
@@ -48,6 +49,12 @@ export function App() {
   const watch = useWatchFolders()
   const versionCounts = useVersionCounts()
   const attention = useAttentionCount()
+  const [analyticsContent, setAnalyticsContent] = useState<{ id: string | null; key: number }>({ id: null, key: 0 })
+
+  function openAnalytics(contentId: string | null) {
+    setAnalyticsContent((c) => ({ id: contentId, key: c.key + 1 }))
+    setScreen('analytics')
+  }
   const [editor, setEditor] = useState<{ contentId: string | null; settings: EditSettings | null; key: number }>({
     contentId: null,
     settings: null,
@@ -132,7 +139,7 @@ export function App() {
     <div className="shell">
       <Sidebar
         current={screen}
-        onNavigate={(id) => (id === 'library' ? openLibrary(DEFAULT_FILTERS) : setScreen(id))}
+        onNavigate={(id) => (id === 'library' ? openLibrary(DEFAULT_FILTERS) : id === 'analytics' ? openAnalytics(null) : setScreen(id))}
         version={info?.version}
         needsReview={needsReview}
         attention={attention}
@@ -161,6 +168,7 @@ export function App() {
             versionCounts={versionCounts}
             onOpenEditor={openEditor}
             onOpenAccounts={() => setScreen('accounts')}
+            onOpenAnalytics={(id) => openAnalytics(id)}
             onNotice={setNotice}
             onError={showError}
           />
@@ -200,6 +208,17 @@ export function App() {
         )}
         {screen === 'calendar' && (
           <CalendarScreen projects={projectList} onOpenQueue={() => setScreen('queue')} onNotice={setNotice} onError={showError} />
+        )}
+        {screen === 'analytics' && (
+          <AnalyticsScreen
+            key={analyticsContent.key}
+            projects={projectList}
+            contentId={analyticsContent.id}
+            onOpenContent={(id) => setAnalyticsContent((c) => ({ id, key: c.key }))}
+            onOpenAccounts={() => setScreen('accounts')}
+            onNotice={setNotice}
+            onError={showError}
+          />
         )}
         {screen === 'accounts' && <AccountsScreen projects={projectList} onNotice={setNotice} onError={showError} />}
         {(Object.keys(PLACEHOLDERS) as PlaceholderId[]).includes(screen as PlaceholderId) && (

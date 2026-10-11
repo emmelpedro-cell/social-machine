@@ -1,3 +1,4 @@
+import type { MetricValues } from '../../shared/analytics'
 import type { Account, DestinationInput, PlatformInfo, Publication, PublicationFields } from '../../shared/publishing'
 import type { AccountRecord } from '../repositories/accounts'
 
@@ -26,6 +27,16 @@ export type PublishResult = {
   scheduledOnPlatform?: boolean
 }
 
+export type MetricsRequest = { publicationId: string; externalPostId: string; publishedAt: string }
+
+export type CollectedMetrics = {
+  /** Values per publication id; publications the platform didn't return are absent. */
+  publications: Map<string, MetricValues>
+  account: { followers: number | null; totalViews: number | null; videoCount: number | null } | null
+  /** Partial failure worth showing (e.g. the Analytics API isn't enabled); the rest was collected. */
+  warning: string | null
+}
+
 /**
  * One module per platform. Capabilities differ: the UI asks `info()` before
  * offering an action, and optional methods exist only where the platform's
@@ -40,6 +51,8 @@ export interface Connector {
   connect?(projectIds: string[]): Promise<Account>
   disconnect?(account: AccountRecord): Promise<void>
   publish?(context: PublishContext): Promise<PublishResult>
+  /** Reads metrics of published posts through the official API. */
+  collectMetrics?(account: AccountRecord, items: readonly MetricsRequest[]): Promise<CollectedMetrics>
   /** Whether the platform can publish at a set time by itself (no app or computer needed then). */
   supportsPlatformScheduling?: boolean
 }

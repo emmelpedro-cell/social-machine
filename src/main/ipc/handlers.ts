@@ -62,6 +62,13 @@ import type { AccountsRepository } from '../repositories/accounts'
 import type { PublicationsRepository } from '../repositories/publications'
 import type { PublishService } from '../publishing/publish-service'
 import type { QueueSettingsRepository } from '../repositories/queue-settings'
+import type { MetricsService } from '../analytics/metrics-service'
+import {
+  ContentAnalyticsInputSchema,
+  ManualMetricsInputSchema,
+  RefreshMetricsInputSchema,
+  SnapshotIdInputSchema
+} from '../../shared/analytics'
 import { nextFreeSlots } from '../../shared/schedule'
 import type { YouTubeClientConfig } from '../connectors/config'
 import type { PresetsRepository } from '../repositories/presets'
@@ -123,6 +130,7 @@ export type HandlerDeps = {
     /** Opens an https URL in the system browser. */
     openExternal: (url: string) => Promise<void>
   }
+  analytics: MetricsService
   onSettingsChanged?: () => void
 }
 
@@ -565,6 +573,30 @@ export function buildHandlers(deps: HandlerDeps): HandlerTable {
         const start = after ? new Date(after) : new Date()
         const occupied = publishing.publications.plannedTimes(accountId, new Date(start.getTime() - 3_600_000).toISOString())
         return nextFreeSlots(publishing.queueSettings.get(accountId), occupied, start, count).map((d) => d.toISOString())
+      }
+    }),
+
+    [IpcChannels.analyticsOverview]: defineHandler({
+      schema: EmptyInputSchema,
+      handle: () => deps.analytics.overview()
+    }),
+    [IpcChannels.analyticsContent]: defineHandler({
+      schema: ContentAnalyticsInputSchema,
+      handle: ({ contentId }) => deps.analytics.content(contentId)
+    }),
+    [IpcChannels.analyticsRefresh]: defineHandler({
+      schema: RefreshMetricsInputSchema,
+      handle: ({ accountId }) => deps.analytics.refresh(accountId)
+    }),
+    [IpcChannels.analyticsAddManual]: defineHandler({
+      schema: ManualMetricsInputSchema,
+      handle: (input) => deps.analytics.addManual(input)
+    }),
+    [IpcChannels.analyticsDeleteManual]: defineHandler({
+      schema: SnapshotIdInputSchema,
+      handle: ({ id }) => {
+        deps.analytics.deleteManual(id)
+        return null
       }
     }),
 

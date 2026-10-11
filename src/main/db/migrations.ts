@@ -270,6 +270,28 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX idx_publications_created ON publications (created_at DESC);
       CREATE INDEX idx_publications_version ON publications (content_version_id);
     `
+  },
+  {
+    version: 4,
+    name: 'metrics',
+    sql: `
+      -- Phase 5: where a snapshot came from ('api' = platform API, 'manual' = typed in by the user).
+      ALTER TABLE metric_snapshots ADD COLUMN source TEXT NOT NULL DEFAULT 'api' CHECK (source IN ('api', 'manual'));
+      -- Account-level numbers (followers/subscribers) over time.
+      CREATE TABLE account_metric_snapshots (
+        id              TEXT PRIMARY KEY NOT NULL,
+        account_id      TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+        captured_at     TEXT NOT NULL,
+        followers       INTEGER,
+        total_views     INTEGER,
+        video_count     INTEGER,
+        additional_json TEXT NOT NULL DEFAULT '{}'
+      );
+      CREATE INDEX idx_account_metric_snapshots ON account_metric_snapshots (account_id, captured_at);
+      -- Last metrics collection per account, and why it failed (shown in Analytics).
+      ALTER TABLE accounts ADD COLUMN metrics_checked_at TEXT;
+      ALTER TABLE accounts ADD COLUMN metrics_error TEXT;
+    `
   }
 ]
 
