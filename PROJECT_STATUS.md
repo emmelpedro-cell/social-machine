@@ -1,8 +1,44 @@
 # Project status
 
-_Last updated: 2026-10-11 — Phase 2_
+_Last updated: 2026-10-11 — Phase 3_
 
-## Current phase: 2 — Editor
+## Current phase: 3 — Accounts and publishing
+
+Acceptance criterion (spec §17): _the user can publish contents through official integrations._
+
+| Item | Status |
+| --- | --- |
+| Platform API rules checked against official docs (YouTube quota and unverified-project rules, OAuth for desktop apps, 7-day refresh tokens in Testing; TikTok audit/private-only) | Done (TD-112, TD-114) |
+| Connector architecture with declared capabilities (publish / manual) | Done |
+| YouTube: OAuth loopback + PKCE with the user's own OAuth client, channel lookup, reconnect keeping history, revoke on disconnect | Done |
+| YouTube upload: resumable, chunked, progress, backoff on 5xx/network, status queries, session saved and continued after a restart, token refresh, "reconnect" on revoked grants, quota messages | Done |
+| TikTok and Instagram as manual destinations: file, caption and hashtags ready, open the upload page, confirm with link | Done (TD-114) |
+| Tokens and client secret encrypted with safeStorage (DPAPI), never in the database or logs | Done (TD-113) |
+| Accounts screen with in-app setup guide; accounts associated with projects | Done |
+| Publish dialog: destinations (project accounts preselected), title, caption, hashtags from the project, YouTube visibility/category/made-for-kids, Shorts note | Done |
+| One publication per destination, validated together, idempotent request id, repeat confirmation, independent failures, retry/cancel | Done (TD-115) |
+| Publication history in the library details, editor and dashboard | Done |
+| Schema v3 | Done |
+
+### Verification (Phase 3)
+
+**Verified on Windows** (GitHub Actions `windows-latest`, run 38101791046, 2026-10-11): install, type check, unit tests, Electron E2E, installer build and packaged-app test all passed.
+
+- **Unit tests: 181 passed, 1 skipped.** New: 17 publishing tests against a local stand-in for Google that implements the documented OAuth/PKCE and resumable-upload behaviour: connect (PKCE verified, tokens only in the secret store, nothing secret in the database), denied consent, upload with exact bytes and metadata, 503s and a dropped connection mid-upload, **continuing an interrupted upload after a restart with the same session**, expired session restarted, access-token refresh, revoked grant → "reconnect" and a successful retry after reconnecting, quota message, idempotent requests and repeat confirmation, independent destinations, validation before creating, cancel, disconnect with revoke, metadata sanitizing, encrypted secret files.
+- **Electron E2E: 14 passed.** New, through the real UI with the Google stand-in: client credentials saved (secret never shown again), channel connected via the consent redirect, account linked to a project, manual TikTok account added, a version published to YouTube (the stand-in received the exact file and the dialog's title, description with hashtags, tags, visibility and made-for-kids) and to TikTok (manual, confirmed with its link), repeat confirmation; after a restart the dashboard shows both publications, the account is still connected, and neither the refresh token nor the client secret appears in the database files.
+- **Packaged app: 2 passed.**
+
+**Not verifiable in CI — needs your Google project and a real channel:** the first real connection and upload. Follow the steps on the Contas screen; if something fails, the error message and `app-data/logs/app.log` say why.
+
+### Known limitations (Phase 3)
+
+- No real-network test against Google in CI (no credentials there); behaviour follows the official protocol documentation and the stand-in.
+- TikTok and Instagram are manual until an approved app exists (TD-114).
+- With the Google project in "Testing", the YouTube login expires every 7 days (Google's rule).
+- Node's fetch doesn't use the Windows proxy settings.
+- Publishing is immediate; scheduling, per-account queues and the calendar are Phase 4.
+
+## Phase 2 — Editor (accepted)
 
 Acceptance criterion (spec §17): _the user can prepare and export videos without opening another editor._
 
@@ -97,8 +133,8 @@ Acceptance criterion (spec §17): _new clips from the Drop Machine appear in the
 
 ## Next task
 
-**Phase 3 — Accounts and publishing**, starting with one platform:
+**Phase 4 — Queue and calendar:**
 
-- Verify current YouTube Data API (quota, audit, upload status), TikTok Content Posting API (audit; unaudited clients may only post privately) and Instagram Graph API requirements against the official documentation.
-- Token storage decision (Electron `safeStorage` vs. Windows Credential Manager).
-- OAuth connection, accounts list and project association, publication fields (title, caption, hashtags from the project), upload of a ready version, per-destination status and history, error handling.
+- Scheduling per destination (local scheduler in the main process using the `tasks`/`publications` tables; YouTube native `publishAt` where it fits), preferred days/times and frequency per account (`queue_settings`).
+- Queue screen grouped by day, reschedule, pause/cancel, duplicate protection, recovery of missed schedules after the computer was off (ask, never publish silently late).
+- Calendar views (day, week, month).
