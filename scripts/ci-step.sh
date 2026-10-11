@@ -8,10 +8,12 @@ set -o pipefail
 title="$1"
 shift
 log="$(mktemp)"
-if "$@" 2>&1 | tee "$log"; then
+"$@" 2>&1 | tee "$log"
+status=$?
+# Note: "$?" read after an if/fi block is the block's status (0), not the command's.
+if [ "$status" -eq 0 ]; then
   exit 0
 fi
-status=$?
 msg=$(tail -n 60 "$log" | sed -e 's/\r//g' -e 's/\x1b\[[0-9;]*m//g' -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
 echo "::error title=${title} failed::${msg}"
 exit "$status"

@@ -290,6 +290,9 @@ describe('aggregation', () => {
     publishedAt: '2026-10-01T00:00:00Z',
     aspectRatio: '9:16',
     durationSeconds: 20,
+    hasText: null,
+    views24h: null,
+    views7d: null,
     latest,
     ...patch
   })
