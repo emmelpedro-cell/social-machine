@@ -190,7 +190,7 @@ export function AnalyticsScreen({ projects, contentId, onOpenContent, onOpenAcco
   const problems = accounts.filter((a) => a.automatic && a.error)
   const manualAccounts = accounts.filter((a) => !a.automatic)
   const tiles: { label: string; value: string; detail: string; testId: string; title?: string }[] = [
-    { label: 'Publicações no período', value: String(total.publications), detail: 'publicadas', testId: 'tile-publications' },
+    { label: 'Publicações', value: String(total.publications), detail: 'publicadas no período', testId: 'tile-publications' },
     { label: 'Visualizações', value: fmtCount(total.totals.views.sum), detail: `${total.totals.views.withData} de ${total.publications} com dado`, testId: 'tile-views' },
     {
       label: 'Engajamento',

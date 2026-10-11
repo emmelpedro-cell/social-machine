@@ -21,7 +21,12 @@ Acceptance criterion (spec §17): _the user can compare the performance of publi
 
 ### Verification (Phase 5)
 
-_Pending CI run._
+**Verified on Windows** (GitHub Actions `windows-latest`, run 38139929274, 2026-10-11): install, type check, unit tests, Electron E2E, installer build and packaged-app test all passed.
+
+- **Unit tests: 204 passed, 1 skipped.** New: collection from the Data API + Analytics stand-in (exact request: `channel==MINE`, `video` dimension, filters, date range; watch time from minutes; hidden likes and not-yet-available Analytics rows stay null); Analytics API disabled → counters saved and the reason shown, cleared on the next success; videos no longer on YouTube noted without numbers; cadence by age and skipping disconnected accounts; revoked login → reconnect; manual numbers only for manual accounts, date and empty-input checks, deleting only typed-in numbers; content history; aggregation with coverage, strict engagement, report marks, duration buckets and periods.
+- **Electron E2E: 16 passed.** New, through the real UI: publish to YouTube and to a manual TikTok account, collect metrics (views, engagement 9,53%, 5 h watched, subscribers), TikTok shown as unavailable until numbers are typed in on the content page ("12,5 mil"), totals and the platform/project comparison update, "Ver desempenho" from the library, and a disabled Analytics API explained while views still update.
+- **Packaged app: 2 passed.**
+- Screenshots of Analytics and the content page taken from the real app on CI (Screenshots run 38140222864).
 
 ### Known limitations (Phase 5)
 

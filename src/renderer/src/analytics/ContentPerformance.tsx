@@ -131,8 +131,9 @@ export function ContentPerformance({ contentId, projects, onBack, onNotice, onEr
                   <tr key={m.hours}>
                     <th scope="row">{m.label}</th>
                     {rows.map((r) => {
-                      const v = valueAt(data.history[r.publicationId] ?? [], r.publishedAt, m.hours, 'views')
+                      // A mark counts only once reached; until then the latest number isn't "the 7-day number".
                       const reached = Date.now() >= new Date(r.publishedAt).getTime() + m.hours * 3_600_000
+                      const v = reached ? valueAt(data.history[r.publicationId] ?? [], r.publishedAt, m.hours, 'views') : null
                       return (
                         <td key={r.publicationId} className={v === null ? 'is-unavailable' : ''}>
                           {v === null ? (reached ? UNAVAILABLE : 'ainda não') : fmtCount(v, true)}
