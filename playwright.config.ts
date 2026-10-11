@@ -10,6 +10,8 @@ export default defineConfig({
     // The built app run from the project folder (`npm run test:e2e`).
     { name: 'dev', testDir: './tests/e2e' },
     // The unpacked Windows build (`npm run dist:win`, then `npm run test:packaged`).
-    { name: 'packaged', testDir: './tests/e2e-packaged' }
+    { name: 'packaged', testDir: './tests/e2e-packaged' },
+    // Not a test suite: captures screenshots of the real app (`Screenshots` workflow).
+    { name: 'screenshots', testDir: './tests/screenshots' }
   ]
 })

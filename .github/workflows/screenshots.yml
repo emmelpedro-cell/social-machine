@@ -1,0 +1,51 @@
+name: Screenshots
+
+# Manually triggered: runs the real app on Windows through a realistic session
+# and publishes the screenshots to the "screenshots" branch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  screenshots:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache FFmpeg download
+        uses: actions/cache@v4
+        with:
+          path: vendor/ffmpeg/.cache
+          key: ffmpeg-${{ hashFiles('scripts/ffmpeg-sources.json') }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npx electron-vite build
+
+      - name: Capture screenshots
+        run: npx playwright test --project=screenshots
+
+      - name: Publish to the screenshots branch
+        run: |
+          mkdir /tmp/shots && cp screenshots/*.png /tmp/shots/
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan screenshots-tmp
+          git rm -rf --cached . > /dev/null
+          git clean -fdx -e node_modules > /dev/null || true
+          cp /tmp/shots/*.png .
+          git add *.png
+          git commit -m "Screenshots from ${GITHUB_SHA::7}"
+          git push --force origin HEAD:screenshots
